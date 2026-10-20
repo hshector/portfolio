@@ -44,6 +44,19 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != '' && github.event_name == 'push'
         run: npx wrangler deploy
 
+      - name: Check the live site
+        if: env.CLOUDFLARE_API_TOKEN != '' && github.event_name == 'push'
+        env:
+          SITE: https://hector-portfolio.hectorsanchispont.workers.dev
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "$SITE/" | grep -q 'Héctor Sanchis'; then break; fi
+            [ "$i" = 6 ] && { echo "::error::$SITE/ did not serve the home page"; exit 1; }
+            sleep 10
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$SITE/no-existe")" = 404
+          echo "::notice::Live at $SITE"
+
       - name: Upload pull request preview
         if: env.CLOUDFLARE_API_TOKEN != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: npx wrangler versions upload --preview-alias "pr-${{ github.event.pull_request.number }}"

@@ -7,7 +7,8 @@ los dos secretos de Cloudflare en GitHub. Hasta entonces avisa y no hace nada m�
 
 1. Crea una cuenta en https://dash.cloudflare.com/sign-up. El plan gratuito no pide tarjeta.
 2. En el panel, abre **Workers & Pages** una vez. La cuenta necesita un subdominio `*.workers.dev`. Si te pide
-   elegir uno, elígelo: es parte de la dirección de la web (`hector-portfolio.<tu-subdominio>.workers.dev`).
+   elegir uno, elígelo. El de Héctor es `hectorsanchispont.workers.dev`, así que la web queda en
+   https://hector-portfolio.hectorsanchispont.workers.dev
 3. Copia tu **Account ID**: aparece en la página de inicio del panel (columna derecha, "Account ID").
 4. Crea un **API token** en https://dash.cloudflare.com/profile/api-tokens → *Create Token* → plantilla
    **Edit Cloudflare Workers** → *Continue to summary* → *Create Token*. Cópialo: solo se muestra una vez.

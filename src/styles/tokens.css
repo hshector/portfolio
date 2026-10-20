@@ -1,0 +1,31 @@
+/* Design tokens. The site lives at night: one deliberate dark look. */
+:root {
+  color-scheme: dark;
+  --sky: #05060d;
+  --sky-2: #0c0e1c;
+  --ink: #e9eaf3;
+  --ink-2: #a9acc2;
+  --ink-3: #6f7391;
+  --line: rgb(233 234 243 / 0.12);
+  --dusk: #ff8a70;       /* sunset coral: the island's accent */
+  --dusk-2: #a597ff;     /* dusk violet */
+
+  --t-economia: #c48800;
+  --t-finanzas: #248860;
+  --t-geopolitica: #d26a97;
+  --t-negocio: #6a96d8;
+  --t-ai: #894ed6;
+  --t-otros: #8a8f9c;
+
+  --f-display: 'Bricolage Grotesque Variable', 'Avenir Next', system-ui, sans-serif;
+  --f-body: 'Hanken Grotesk Variable', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --step--1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.1rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --step-3: clamp(2.2rem, 1.6rem + 3vw, 4.4rem);
+
+  --gutter: max(16px, env(safe-area-inset-left, 0px));
+  --radius: 14px;
+}

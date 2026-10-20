@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Página no encontrada" description="Esta página no existe.">
+  <main>
+    <h1>Aquí no hay nada</h1>
+    <p>Esta página no existe o ha cambiado de sitio.</p>
+    <a href="/">Volver al inicio</a>
+  </main>
+</Base>
+
+<style>
+  main { max-width: 40rem; margin: 0 auto; padding-block: 18vh; display: grid; gap: 16px; }
+  h1 { font-size: var(--step-3); font-weight: 800; }
+  p { color: var(--ink-2); }
+</style>

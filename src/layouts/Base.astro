@@ -1,0 +1,52 @@
+---
+import '@fontsource-variable/bricolage-grotesque/index.css';
+import '@fontsource-variable/hanken-grotesk/index.css';
+import '@fontsource-variable/jetbrains-mono/index.css';
+import '../styles/tokens.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#05060d" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  * { box-sizing: border-box; }
+  html { background: var(--sky); }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background:
+      radial-gradient(120% 60% at 50% 115%, rgb(255 138 112 / 0.18), transparent 60%),
+      radial-gradient(80% 50% at 85% 0%, rgb(165 151 255 / 0.12), transparent 70%),
+      var(--sky);
+    color: var(--ink);
+    font: 400 var(--step-0) / 1.6 var(--f-body);
+    padding-inline: var(--gutter) max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--dusk); outline-offset: 3px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>

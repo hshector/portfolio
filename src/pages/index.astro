@@ -1,0 +1,70 @@
+---
+import Base from '../layouts/Base.astro';
+import { author, library, warrenia } from '../data/site';
+import { THEMES } from '../lib/themes';
+
+const fmt = new Intl.NumberFormat('es-ES', { useGrouping: true });
+---
+<Base
+  title={`${author.name} · proyectos`}
+  description="WarrenIA, un sistema personal de inteligencia financiera, y una biblioteca de 48 libros y más de 3.000 conceptos conectados."
+>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Proyectos</p>
+      <h1>{author.name}</h1>
+      <p class="lede">Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo. Aquí están las dos cosas.</p>
+    </header>
+
+    <section class="projects" aria-label="Proyectos">
+      <article class="card" aria-labelledby="w-title">
+        <p class="kicker">Obra I</p>
+        <h2 id="w-title">{warrenia.name}</h2>
+        <p>{warrenia.summary}</p>
+        <ul class="tags" aria-label="Tecnologías">
+          {warrenia.stack.map((s) => <li>{s}</li>)}
+        </ul>
+        <p class="facts">{warrenia.facts.join(' · ')}</p>
+        <a class="link" href={warrenia.repo}>Ver el código en GitHub</a>
+      </article>
+
+      <article class="card" aria-labelledby="b-title">
+        <p class="kicker">Biblioteca</p>
+        <h2 id="b-title">Notas de lectura</h2>
+        <p>
+          {fmt.format(library.books)} libros y {fmt.format(library.concepts)} conceptos unidos por {fmt.format(library.links)} enlaces.
+          Pronto se podrán recorrer como una constelación.
+        </p>
+        <ul class="themes" aria-label="Temáticas">
+          {THEMES.map((t) => <li data-mark={t.mark} style={`--c: ${t.color}`}><i aria-hidden="true"></i>{t.name}</li>)}
+        </ul>
+      </article>
+    </section>
+
+    <footer>
+      <p>La isla en 3D está en construcción.</p>
+      <a href={author.github}>GitHub</a>
+    </footer>
+  </main>
+</Base>
+
+<style>
+  main { max-width: 1040px; margin: 0 auto; padding-block: clamp(48px, 10vw, 120px) 64px; display: grid; gap: clamp(40px, 7vw, 80px); }
+  .hero { display: grid; gap: 18px; max-width: 46rem; }
+  .eyebrow, .kicker { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
+  h1 { font-size: var(--step-3); font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; }
+  .lede { font-size: var(--step-1); color: var(--ink-2); max-width: 36rem; }
+  .projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px; }
+  .card { display: grid; gap: 14px; align-content: start; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(160deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.01)); min-width: 0; }
+  .card h2 { font-size: var(--step-1); font-weight: 700; }
+  .card p { color: var(--ink-2); }
+  .tags, .themes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .tags li { font: 500 var(--step--1) / 1 var(--f-mono); padding: 7px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--ink-2); }
+  .themes li { display: inline-flex; align-items: center; gap: 8px; font-size: var(--step--1); padding: 6px 11px; border-radius: 99px; background: rgb(255 255 255 / 0.04); }
+  .themes i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .themes li[data-mark='ring'] i { background: transparent; border: 2px solid var(--c); box-shadow: none; }
+  .card .kicker { color: var(--dusk-2); }
+  .facts { font: 500 var(--step--1) / 1.4 var(--f-mono); color: var(--ink) !important; }
+  .link { justify-self: start; color: var(--ink); text-underline-offset: 4px; }
+  footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; color: var(--ink-3); font-size: var(--step--1); border-top: 1px solid var(--line); padding-top: 20px; }
+</style>

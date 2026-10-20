@@ -16,9 +16,17 @@ los dos secretos de Cloudflare en GitHub. Hasta entonces avisa y no hace nada m�
    crea dos secretos:
    - `CLOUDFLARE_API_TOKEN` con el token del paso 4.
    - `CLOUDFLARE_ACCOUNT_ID` con el ID del paso 3.
-6. Vuelve a lanzar el último CI (pestaña *Actions* → el último run → *Re-run all jobs*), o haz cualquier push.
+6. Crea un token de GitHub de solo lectura para el vault en https://github.com/settings/personal-access-tokens/new
+   (*Only select repositories* → `hshector/vault-libros`; *Repository permissions* → *Contents: Read-only*) y
+   guárdalo como secreto `VAULT_TOKEN`. Sin él, el CI se detiene con un error que lo explica.
+7. Vuelve a lanzar el último CI (pestaña *Actions* → el último run → *Re-run all jobs*), o haz cualquier push.
 
 ## Qué pasa después
+
+- **Cada día a las 05:17 UTC** el CI vuelve a construir la web con la última versión del vault. Para no esperar,
+  pestaña *Actions* → *CI* → *Run workflow*.
+- Si el vault tiene un problema (un enlace roto, un libro que falta en `tematicas.yml`, una fórmula que no se
+  puede mostrar), el CI falla, no se publica nada y el error dice qué nota corregir.
 
 - **Push a `main`:** despliegue a producción con `wrangler deploy`.
 - **Pull request:** versión de previsualización en `pr-<número>-hector-portfolio.<subdominio>.workers.dev`

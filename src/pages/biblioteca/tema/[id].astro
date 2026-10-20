@@ -1,0 +1,75 @@
+---
+import { num } from '../../../lib/format';
+import Base from '../../../layouts/Base.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import ThemeChip from '../../../components/ThemeChip.astro';
+import { byTitle, library } from '../../../lib/library';
+import { THEMES, type Theme } from '../../../lib/themes';
+
+export function getStaticPaths() {
+  const { themes } = library();
+  return THEMES.filter((t) => themes.includes(t.name)).map((theme) => ({ params: { id: theme.id }, props: { theme } }));
+}
+
+const { theme } = Astro.props as { theme: Theme };
+const notes = library().notes.filter((n) => n.theme === theme.name);
+const books = notes.filter((n) => n.kind === 'book').sort((a, b) => b.related.length - a.related.length);
+const concepts = notes.filter((n) => n.kind === 'concept').sort(byTitle);
+const letter = (t: string) => t.normalize('NFD')[0].toUpperCase().replace(/[^A-Z]/, '#');
+const groups = Object.entries(Object.groupBy(concepts, (c) => letter(c.title))).sort(([a], [b]) => a.localeCompare(b));
+---
+<Base title={`${theme.name} · Biblioteca`} description={`${books.length} libros y ${concepts.length} conceptos de ${theme.name}.`}>
+  <SiteHeader />
+  <main>
+    <nav class="crumbs" aria-label="Ruta"><a href="/biblioteca">Biblioteca</a></nav>
+    <header class="head">
+      <ThemeChip theme={theme} />
+      <h1>{theme.name}</h1>
+      <p>{num(books.length)} {books.length === 1 ? 'libro' : 'libros'} y {num(concepts.length)} conceptos.</p>
+    </header>
+
+    <section aria-labelledby="books-title">
+      <h2 id="books-title">Libros</h2>
+      <ul class="books">
+        {books.map((b) => (
+          <li><a href={`/biblioteca/${b.slug}`}><b>{b.book!.title}</b><span>{b.book!.author}</span><span class="n">{num(b.related.length)} conceptos</span></a></li>
+        ))}
+      </ul>
+    </section>
+
+    <section aria-labelledby="concepts-title">
+      <h2 id="concepts-title">Conceptos</h2>
+      <nav class="letters" aria-label="Letras">{groups.map(([l]) => <a href={`#letra-${l}`}>{l}</a>)}</nav>
+      {groups.map(([l, items]) => (
+        <div class="group">
+          <h3 id={`letra-${l}`}>{l}</h3>
+          <ul class="concepts">{items!.map((c) => <li><a href={`/biblioteca/${c.slug}`}>{c.title}</a></li>)}</ul>
+        </div>
+      ))}
+    </section>
+  </main>
+</Base>
+
+<style>
+  main { max-width: 1040px; margin: 0 auto; padding-block: 28px 96px; display: grid; gap: 36px; }
+  .crumbs a { font-size: var(--step--1); color: var(--ink-2); text-decoration: none; }
+  .head { display: grid; gap: 12px; justify-items: start; }
+  h1 { font-size: var(--step-3); font-weight: 800; line-height: 1; }
+  .head p { color: var(--ink-2); }
+  h2 { font: 700 var(--step-1) / 1.2 var(--f-display); margin-bottom: 14px; }
+  .books { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+  .books a { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; height: 100%; }
+  .books a:hover { border-color: rgb(255 255 255 / 0.3); }
+  .books b { font-weight: 600; }
+  .books span { color: var(--ink-2); font-size: var(--step--1); }
+  .books .n { font-family: var(--f-mono); color: var(--ink-3); }
+  .letters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
+  .letters a { font: 600 var(--step--1) / 1 var(--f-mono); padding: 7px 9px; border-radius: 8px; text-decoration: none; color: var(--ink-2); background: rgb(255 255 255 / 0.04); }
+  .letters a:hover { color: var(--ink); }
+  .group { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .group h3 { font: 800 var(--step-1) / 1 var(--f-display); color: var(--ink-3); scroll-margin-top: 16px; }
+  .concepts { list-style: none; margin: 0; padding: 0; columns: 3 220px; column-gap: 24px; }
+  .concepts li { break-inside: avoid; padding: 3px 0; }
+  .concepts a { color: var(--ink-2); text-decoration: none; font-size: var(--step--1); }
+  .concepts a:hover { color: var(--ink); text-decoration: underline; }
+</style>

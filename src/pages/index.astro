@@ -1,14 +1,16 @@
 ---
+import { num } from '../lib/format';
 import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
 import { author, library, warrenia } from '../data/site';
 import { THEMES } from '../lib/themes';
 
-const fmt = new Intl.NumberFormat('es-ES', { useGrouping: true });
 ---
 <Base
   title={`${author.name} · proyectos`}
   description="WarrenIA, un sistema personal de inteligencia financiera, y una biblioteca de 48 libros y más de 3.000 conceptos conectados."
 >
+  <SiteHeader />
   <main>
     <header class="hero">
       <p class="eyebrow">Proyectos</p>
@@ -25,16 +27,17 @@ const fmt = new Intl.NumberFormat('es-ES', { useGrouping: true });
           {warrenia.stack.map((s) => <li>{s}</li>)}
         </ul>
         <p class="facts">{warrenia.facts.join(' · ')}</p>
-        <a class="link" href={warrenia.repo}>Ver el código en GitHub</a>
+        <a class="link" href="/warrenia">Ver el proyecto</a>
       </article>
 
       <article class="card" aria-labelledby="b-title">
         <p class="kicker">Biblioteca</p>
         <h2 id="b-title">Notas de lectura</h2>
         <p>
-          {fmt.format(library.books)} libros y {fmt.format(library.concepts)} conceptos unidos por {fmt.format(library.links)} enlaces.
+          {num(library.books)} libros y {num(library.concepts)} conceptos unidos por {num(library.links)} enlaces.
           Pronto se podrán recorrer como una constelación.
         </p>
+        <a class="link" href="/biblioteca">Entrar en la biblioteca</a>
         <ul class="themes" aria-label="Temáticas">
           {THEMES.map((t) => <li data-mark={t.mark} style={`--c: ${t.color}`}><i aria-hidden="true"></i>{t.name}</li>)}
         </ul>

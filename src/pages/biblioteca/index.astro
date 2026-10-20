@@ -1,0 +1,90 @@
+---
+import { num } from '../../lib/format';
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import ThemeChip from '../../components/ThemeChip.astro';
+import { library } from '../../lib/library';
+import { THEMES } from '../../lib/themes';
+
+const { notes, report, themes } = library();
+const sections = THEMES.filter((t) => themes.includes(t.name)).map((theme) => {
+  const mine = notes.filter((n) => n.theme === theme.name);
+  const books = mine.filter((n) => n.kind === 'book').sort((a, b) => b.related.length - a.related.length);
+  return { theme, books, concepts: mine.length - books.length };
+});
+---
+<Base
+  title="Biblioteca · Héctor Sanchis"
+  description={`Notas de lectura de ${report.books} libros: ${num(report.concepts)} conceptos conectados en ${themes.length} temáticas.`}
+>
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  <SiteHeader />
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Biblioteca</p>
+      <h1>Notas de lectura</h1>
+      <p class="lede">
+        {report.books} libros, {num(report.concepts)} conceptos y {num(report.links)} conexiones entre ellos.
+        Cada libro pertenece a una temática y cada concepto hereda la de los libros donde aparece.
+      </p>
+    </header>
+
+    <section class="search" aria-label="Buscar en la biblioteca">
+      <div id="search"></div>
+      <noscript><p>La búsqueda necesita JavaScript. Puedes recorrer la biblioteca por temáticas.</p></noscript>
+    </section>
+
+    <section class="themes" aria-label="Temáticas">
+      {sections.map(({ theme, books, concepts }) => (
+        <article class="theme" style={`--c: ${theme.color}`}>
+          <div class="top">
+            <ThemeChip theme={theme} />
+            <p class="counts">{books.length} {books.length === 1 ? 'libro' : 'libros'} · {num(concepts)} conceptos</p>
+          </div>
+          <ul>
+            {books.slice(0, 5).map((b) => (
+              <li><a href={`/biblioteca/${b.slug}`}>{b.book!.title}</a> <span>{b.book!.author}</span></li>
+            ))}
+          </ul>
+          <a class="all" href={`/biblioteca/tema/${theme.id}`}>Ver {theme.name}{books.length > 5 ? ` (${books.length - 5} ${books.length - 5 === 1 ? 'libro' : 'libros'} más)` : ''}</a>
+        </article>
+      ))}
+    </section>
+  </main>
+</Base>
+
+<script is:inline src="/pagefind/pagefind-ui.js"></script>
+<script is:inline>
+  if (window.PagefindUI) {
+    new PagefindUI({
+      element: '#search',
+      showSubResults: false,
+      showImages: false,
+      resetStyles: false,
+      translations: { placeholder: 'Busca un concepto, un autor o una idea' },
+    });
+  }
+</script>
+
+<style>
+  main { max-width: 1040px; margin: 0 auto; padding-block: 40px 96px; display: grid; gap: 40px; }
+  .hero { display: grid; gap: 14px; max-width: 46rem; }
+  .eyebrow { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
+  h1 { font-size: var(--step-3); font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; }
+  .lede { font-size: var(--step-1); color: var(--ink-2); }
+  .search { --pagefind-ui-scale: 0.9; --pagefind-ui-primary: var(--dusk); --pagefind-ui-text: var(--ink); --pagefind-ui-background: var(--sky-2); --pagefind-ui-border: rgb(255 255 255 / 0.16); --pagefind-ui-tag: rgb(255 255 255 / 0.08); --pagefind-ui-border-radius: 12px; --pagefind-ui-font: var(--f-body); }
+  .search :global(.pagefind-ui__result-link) { color: var(--ink); }
+  .search :global(.pagefind-ui__result-excerpt) { color: var(--ink-2); }
+  .search :global(.pagefind-ui__search-input::placeholder) { color: var(--ink-2); opacity: 1; }
+  .search :global(mark) { background: rgb(255 138 112 / 0.25); color: var(--ink); }
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+  .theme { display: grid; gap: 14px; align-content: start; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(160deg, color-mix(in oklab, var(--c) 10%, transparent), transparent 60%); }
+  .top { display: grid; gap: 10px; justify-items: start; }
+  .counts { font: 500 var(--step--1) / 1 var(--f-mono); color: var(--ink-2); }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  li { font-size: var(--step--1); }
+  li a { color: var(--ink); text-decoration: none; font-weight: 500; }
+  li a:hover { text-decoration: underline; }
+  li span { color: var(--ink-3); }
+  .all { justify-self: start; font-size: var(--step--1); color: var(--ink); text-underline-offset: 4px; }
+</style>

@@ -1,0 +1,14 @@
+---
+import type { Theme } from '../lib/themes';
+interface Props { theme: Theme; href?: string }
+const { theme, href } = Astro.props;
+const Tag = href ? 'a' : 'span';
+---
+<Tag class="chip" href={href} data-mark={theme.mark} style={`--c: ${theme.color}`}><i aria-hidden="true"></i>{theme.name}</Tag>
+
+<style>
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: var(--step--1); line-height: 1; padding: 7px 11px; border-radius: 99px; background: rgb(255 255 255 / 0.05); color: var(--ink); text-decoration: none; white-space: nowrap; }
+  a.chip:hover { background: rgb(255 255 255 / 0.1); }
+  i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); flex: none; }
+  .chip[data-mark='ring'] i { background: transparent; border: 2px solid var(--c); box-shadow: none; }
+</style>

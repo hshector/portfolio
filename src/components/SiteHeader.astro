@@ -1,0 +1,25 @@
+---
+const path = Astro.url.pathname;
+const items = [
+  { href: '/', label: 'Inicio' },
+  { href: '/warrenia', label: 'WarrenIA' },
+  { href: '/biblioteca', label: 'Biblioteca' },
+];
+---
+<header class="site">
+  <a class="brand" href="/">Héctor Sanchis</a>
+  <nav aria-label="Principal">
+    {items.map((i) => (
+      <a href={i.href} aria-current={(i.href === '/' ? path === '/' : path.startsWith(i.href)) ? 'page' : undefined}>{i.label}</a>
+    ))}
+  </nav>
+</header>
+
+<style>
+  .site { max-width: 1040px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+  .brand { font: 700 var(--step-0) / 1 var(--f-display); text-decoration: none; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a { font-size: var(--step--1); text-decoration: none; color: var(--ink-2); padding: 7px 11px; border-radius: 99px; }
+  nav a:hover { color: var(--ink); background: rgb(255 255 255 / 0.06); }
+  nav a[aria-current='page'] { color: var(--ink); background: rgb(255 255 255 / 0.1); }
+</style>

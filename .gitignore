@@ -7,3 +7,8 @@ playwright-report/
 .env
 .dev.vars
 .DS_Store
+
+# Generated from the vault at build time
+.generated/
+public/data/
+vault/

@@ -1,0 +1,104 @@
+---
+import { num } from '../../lib/format';
+import 'katex/dist/katex.min.css';
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import ThemeChip from '../../components/ThemeChip.astro';
+import { byTitle, library, themeOf, type LibraryNote } from '../../lib/library';
+
+export function getStaticPaths() {
+  return library().notes.map((note) => ({ params: { slug: note.slug }, props: { note } }));
+}
+
+const { note } = Astro.props as { note: LibraryNote };
+const { bySlug } = library();
+const theme = themeOf(note);
+const notesFor = (slugs: string[]) => slugs.map((s) => bySlug.get(s)!).filter(Boolean);
+const concepts = note.kind === 'book' ? notesFor(note.related) : [];
+const backlinks = note.kind === 'concept' ? notesFor(note.backlinks).filter((n) => n.kind === 'concept').sort(byTitle) : [];
+const description = note.kind === 'book'
+  ? `${note.book!.title}, de ${note.book!.author}: resumen y ${concepts.length} conceptos.`
+  : note.excerpt;
+---
+<Base title={`${note.kind === 'book' ? note.book!.title : note.title} · Biblioteca`} description={description}>
+  <SiteHeader />
+  <main>
+    <nav class="crumbs" aria-label="Ruta">
+      <a href="/biblioteca">Biblioteca</a><span aria-hidden="true">/</span><a href={`/biblioteca/tema/${theme.id}`}>{theme.name}</a>
+    </nav>
+
+    <article data-pagefind-body>
+      <header class="head">
+        <p class="kind" data-pagefind-meta={`tipo:${note.kind === 'book' ? 'Libro' : 'Concepto'}`}>{note.kind === 'book' ? 'Libro' : 'Concepto'}</p>
+        {note.kind === 'book' ? (
+          <>
+            <h1 data-pagefind-meta="title">{note.book!.title}</h1>
+            <p class="byline">
+              {note.book!.author}{note.book!.year && <> · {note.book!.year}</>}{note.book!.publisher && <> · <span class="muted">{note.book!.publisher}</span></>}
+            </p>
+          </>
+        ) : (
+          <h1 data-pagefind-meta="title">{note.title}</h1>
+        )}
+        <span data-pagefind-filter="temática"><ThemeChip theme={theme} href={`/biblioteca/tema/${theme.id}`} /></span>
+      </header>
+
+      {note.kind === 'book' && <h2 class="section">Resumen</h2>}
+      <div class="prose" set:html={note.html} />
+
+      {note.kind === 'book' && (
+        <section aria-labelledby="concepts-title">
+          <h2 id="concepts-title" class="section">Conceptos de este libro <span class="count">{num(concepts.length)}</span></h2>
+          <ul class="links cols">
+            {concepts.map((c) => <li><a href={`/biblioteca/${c.slug}`}>{c.title}</a></li>)}
+          </ul>
+        </section>
+      )}
+    </article>
+
+    {backlinks.length > 0 && (
+      <section aria-labelledby="back-title" class="back">
+        <h2 id="back-title" class="section">Enlazan aquí <span class="count">{num(backlinks.length)}</span></h2>
+        <ul class="links cols">
+          {backlinks.map((c) => <li><a href={`/biblioteca/${c.slug}`}>{c.title}</a></li>)}
+        </ul>
+      </section>
+    )}
+  </main>
+</Base>
+
+<style>
+  main { max-width: 760px; margin: 0 auto; padding-block: 28px 96px; display: grid; gap: 28px; }
+  .crumbs { display: flex; gap: 8px; font-size: var(--step--1); color: var(--ink-3); }
+  .crumbs a { color: var(--ink-2); text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); text-decoration: underline; }
+  article { display: grid; gap: 22px; min-width: 0; }
+  .head { display: grid; gap: 12px; justify-items: start; }
+  .kind { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
+  h1 { font-size: clamp(1.9rem, 1.4rem + 2.4vw, 3rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.015em; }
+  .byline { color: var(--ink-2); }
+  .muted { color: var(--ink-3); }
+  .section { font: 700 var(--step-1) / 1.2 var(--f-display); display: flex; align-items: baseline; gap: 10px; }
+  .count { font: 500 var(--step--1) / 1 var(--f-mono); color: var(--ink-3); }
+  .links { list-style: none; margin: 14px 0 0; padding: 0; }
+  .cols { columns: 2 260px; column-gap: 28px; }
+  .links li { break-inside: avoid; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .links a { color: var(--ink-2); text-decoration: none; }
+  .links a:hover { color: var(--ink); text-decoration: underline; }
+  .back { border-top: 1px solid var(--line); padding-top: 28px; }
+
+  .prose { min-width: 0; color: var(--ink); line-height: 1.7; overflow-wrap: break-word; }
+  .prose :global(p), .prose :global(ul), .prose :global(ol) { margin: 0 0 1em; }
+  .prose :global(h2) { font: 700 var(--step-1) / 1.25 var(--f-display); margin: 1.6em 0 0.6em; }
+  .prose :global(h3) { font: 700 var(--step-0) / 1.3 var(--f-display); margin: 1.4em 0 0.5em; }
+  .prose :global(li) { margin: 0.3em 0; }
+  .prose :global(li > p) { margin: 0; }
+  .prose :global(a) { color: var(--ink); text-decoration-color: var(--dusk-2); text-underline-offset: 3px; }
+  .prose :global(a:hover) { text-decoration-color: var(--dusk); }
+  .prose :global(strong) { color: #fff; font-weight: 600; }
+  .prose :global(blockquote) { margin: 0 0 1em; padding-left: 16px; border-left: 2px solid var(--line); color: var(--ink-2); }
+  .prose :global(.katex) { font-size: 1.05em; }
+  .prose :global(.katex-display) { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+  .prose :global(table) { display: block; overflow-x: auto; border-collapse: collapse; }
+  .prose :global(th), .prose :global(td) { border: 1px solid var(--line); padding: 6px 10px; }
+</style>

@@ -27,9 +27,17 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 - **Colores de temáticas:** `src/lib/themes.ts`. `tests/themes.test.ts` comprueba que sigan distinguiéndose
   (también con daltonismo). Si cambias un color, los tests deben seguir en verde.
 
+## Biblioteca (fase F1)
+
+- `scripts/library/`: lee el vault (`VAULT_DIR`, por defecto `./vault`), valida, convierte a HTML (KaTeX en el
+  build) y genera `.generated/library.json`, `.generated/library-report.md` y `public/data/graph.{json,bin}`
+  (posiciones 3D precalculadas para la constelación de F2).
+- `scripts/check-dist.ts`: enlaces internos, que ningún libro publique sus notas privadas y límites de Cloudflare.
+- URLs: `/biblioteca/<slug>` para libros y conceptos, `/biblioteca/tema/<id>` para temáticas.
+
 ## Comandos
 
-- `npm run dev`: servidor de desarrollo.
-- `npm run check` · `npm test` · `npm run build` · `npm run test:e2e`: lo mismo que ejecuta el CI.
+- `npm run dev`: servidor de desarrollo (antes, `npm run library` con `VAULT_DIR` apuntando al vault).
+- `npm run check` · `npm test` · `npm run build` · `npm run check:dist` · `npm run test:e2e`: lo que ejecuta el CI.
 - `npm run preview`: sirve `dist/` con wrangler, igual que Cloudflare en producción.
 - En un entorno con Chromium preinstalado: `PW_CHROMIUM_PATH=<ruta> npm run test:e2e`.

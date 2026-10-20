@@ -1,0 +1,109 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { warrenia } from '../data/site';
+import inicio from '../assets/warrenia/desktop-inicio.png';
+import radar from '../assets/warrenia/desktop-radar.png';
+import cartera from '../assets/warrenia/desktop-cartera.png';
+import mInicio from '../assets/warrenia/mobile-inicio.png';
+import mFicha from '../assets/warrenia/mobile-ficha.png';
+
+// Facts from the WarrenIA README and docs/ARCHITECTURE.md.
+const features = [
+  { name: 'Plan', text: 'Qué comprar cada mes: ETF global, diversificadores, momentum y liquidez opcional, con la fiscalidad española y una proyección de patrimonio.' },
+  { name: 'Alertas', text: 'Avisos push cuando cambia una señal.' },
+  { name: 'Momentum Radar', text: 'Screener cuantitativo de momentum, explicable y reproducible: cada activo dice por qué está ahí.' },
+  { name: 'Cartera', text: 'Contabilidad con lotes FIFO, rentabilidad TWR y TIR, y desviación frente a los objetivos del plan.' },
+  { name: 'Antes de vender', text: 'El IRPF de una venta estimado antes de hacerla: lotes FIFO, tramos del ahorro y la regla de recompra de 2 meses o 1 año.' },
+];
+const pipeline = [
+  { k: 'Fuentes', v: 'Massive (cierres de EE. UU.), SEC EDGAR, BCE (tipos de cambio) y EODHD' },
+  { k: 'Motor', v: 'Python en GitHub Actions cada día: ingesta, validación, indicadores, scores y clasificación' },
+  { k: 'Artefactos', v: 'Ficheros inmutables por ejecución en Supabase Storage, con hash de configuración y commit' },
+  { k: 'Web', v: 'Next.js 16 en Vercel: lee los artefactos ya calculados y calcula la cartera al instante en TypeScript' },
+  { k: 'Usuario', v: 'Postgres con RLS solo para operaciones, ajustes y watchlist; login por enlace mágico' },
+];
+const decisions = [
+  ['Mercado en Python, cartera en TypeScript', 'El ranking es un cálculo vectorizado sobre miles de activos; la cartera debe recalcularse al instante al registrar una operación.'],
+  ['GitHub Actions como ejecutor', 'Gratis, con trabajos de hasta 6 horas y ejecución programada. La descarga inicial dura unas 2 horas.'],
+  ['Artefactos versionados', 'Cada ejecución publica ficheros inmutables y el puntero a la última se escribe al final: nadie ve una ejecución a medias.'],
+  ['Fallar cerrado', 'Sin configuración no muestra nada, y el modo local sin login nunca funciona en producción.'],
+];
+---
+<Base title="WarrenIA · Héctor Sanchis" description={warrenia.summary}>
+  <SiteHeader />
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Obra I</p>
+      <h1>WarrenIA</h1>
+      <p class="lede">{warrenia.summary}</p>
+      <ul class="facts" aria-label="Datos">
+        <li><b>259</b> tests (100 del motor, 90 de la web, 69 E2E)</li>
+        <li><b>0 €</b> al mes</li>
+        <li><b>PWA</b> instalable en el móvil</li>
+      </ul>
+      <p class="note">La app real requiere acceso. Todas las capturas usan datos de demostración ficticios. Más adelante aquí habrá una demo interactiva con el propio código de WarrenIA.</p>
+    </header>
+
+    <section class="shots" aria-label="Capturas">
+      <figure class="wide"><Image src={inicio} alt="Inicio de WarrenIA con el valor de la cartera y la próxima aportación (datos de demostración)" widths={[720, 1440]} sizes="(min-width: 1040px) 1040px, 100vw" loading="eager" /><figcaption>Inicio: valor de la cartera y reparto de la próxima aportación.</figcaption></figure>
+      <figure><Image src={radar} alt="Momentum Radar con activos de demostración ordenados por puntuación" widths={[720, 1440]} sizes="(min-width: 1040px) 520px, 100vw" /><figcaption>Momentum Radar.</figcaption></figure>
+      <figure><Image src={cartera} alt="Cartera con la evolución del valor, TWR y TIR (datos de demostración)" widths={[720, 1440]} sizes="(min-width: 1040px) 520px, 100vw" /><figcaption>Cartera con TWR y TIR.</figcaption></figure>
+      <figure class="phone"><Image src={mInicio} alt="WarrenIA en el móvil: inicio" widths={[390, 780]} sizes="260px" /><figcaption>En el móvil.</figcaption></figure>
+      <figure class="phone"><Image src={mFicha} alt="WarrenIA en el móvil: ficha de un activo de demostración" widths={[390, 780]} sizes="260px" /><figcaption>Ficha de un activo.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="f-title">
+      <h2 id="f-title">Qué hace</h2>
+      <dl class="features">
+        {features.map((f) => <div><dt>{f.name}</dt><dd>{f.text}</dd></div>)}
+      </dl>
+    </section>
+
+    <section aria-labelledby="a-title">
+      <h2 id="a-title">Cómo está hecho</h2>
+      <ol class="pipeline">
+        {pipeline.map((p) => <li><b>{p.k}</b><span>{p.v}</span></li>)}
+      </ol>
+      <dl class="decisions">
+        {decisions.map(([d, why]) => <div><dt>{d}</dt><dd>{why}</dd></div>)}
+      </dl>
+    </section>
+
+    <footer class="end">
+      <p>Herramienta de análisis: no ejecuta operaciones, no se conecta a ningún bróker y no presenta predicciones como certezas.</p>
+      <a href={warrenia.repo}>Ver el código en GitHub</a>
+    </footer>
+  </main>
+</Base>
+
+<style>
+  main { max-width: 1040px; margin: 0 auto; padding-block: 40px 96px; display: grid; gap: 56px; }
+  .hero { display: grid; gap: 16px; max-width: 48rem; }
+  .eyebrow { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
+  h1 { font-size: var(--step-3); font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; }
+  .lede { font-size: var(--step-1); color: var(--ink-2); }
+  .facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .facts li { font-size: var(--step--1); padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; color: var(--ink-2); }
+  .facts b { color: var(--ink); font-family: var(--f-mono); }
+  .note { font-size: var(--step--1); color: var(--ink-3); }
+  h2 { font: 700 var(--step-1) / 1.2 var(--f-display); margin-bottom: 18px; }
+  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) repeat(2, minmax(0, 0.5fr)); gap: 16px; align-items: start; }
+  .shots figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+  .shots .wide { grid-column: 1 / -1; }
+  .shots img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); display: block; }
+  figcaption { font-size: var(--step--1); color: var(--ink-3); }
+  @media (max-width: 760px) { .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); } .shots figure:not(.phone) { grid-column: 1 / -1; } }
+  .features, .decisions { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+  .features div, .decisions div { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; }
+  dt { font-weight: 600; margin-bottom: 6px; }
+  dd { margin: 0; color: var(--ink-2); font-size: var(--step--1); }
+  .pipeline { list-style: none; counter-reset: s; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; }
+  .pipeline li { counter-increment: s; display: grid; grid-template-columns: 28px 120px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .pipeline li::before { content: counter(s); font: 600 var(--step--1) / 1 var(--f-mono); color: var(--dusk); }
+  .pipeline span { color: var(--ink-2); }
+  @media (max-width: 560px) { .pipeline li { grid-template-columns: 28px minmax(0, 1fr); } .pipeline span { grid-column: 2; } }
+  .end { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 24px; color: var(--ink-3); font-size: var(--step--1); }
+  .end a { color: var(--ink); justify-self: start; }
+</style>

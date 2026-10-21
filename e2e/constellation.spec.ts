@@ -3,12 +3,20 @@ import { expect, test, type Page } from '@playwright/test';
 // The constellation is drawn with WebGL; these tests drive it through the page and a small
 // debug API it exposes (window.__constellation) to know which star is focused.
 
+type Label = { text: string; kind: string; rect: { left: number; right: number; top: number; bottom: number } };
 type Api = {
   focus(): string | null;
+  labels(): Label[];
+  onScreen(): number;
+  zoom(distance: number): void;
+  select(slug: string): void;
   visibleStars(): number;
   starScreen(slug: string): { x: number; y: number; visible: boolean };
 };
-const api = <T>(page: Page, fn: (c: Api) => T) => page.evaluate(fn as never, undefined) as Promise<T>;
+const api = async <T>(page: Page, fn: (c: Api) => T): Promise<T> => {
+  const handle = await page.evaluateHandle(() => (window as unknown as { __constellation: Api }).__constellation);
+  return handle.evaluate(fn as never) as Promise<T>;
+};
 const ready = async (page: Page, url: string) => {
   await page.goto(url);
   await expect(page.locator('[data-constellation]')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
@@ -123,4 +131,46 @@ test('on a phone the focused star stays above the reading sheet', async ({ page,
   expect(overflow).toBe(false);
   expect(star.visible).toBe(true);
   expect(star.y).toBeLessThan(sheetTop);
+});
+
+const overlaps = (a: Label['rect'], b: Label['rect']) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+const checkLabels = async (page: Page) => {
+  const labels = await api(page, (c) => c.labels());
+  const ui = await page.evaluate(() =>
+    ['.bar > *', '#legend button', '#panel']
+      .flatMap((s) => [...document.querySelectorAll<HTMLElement>(s)])
+      .filter((e) => !e.hidden && e.offsetParent)
+      .map((e) => e.getBoundingClientRect().toJSON()),
+  );
+  for (const l of labels) {
+    expect(ui.some((u) => overlaps(l.rect, u)), `"${l.text}" covers the interface`).toBe(false);
+    for (const o of labels) if (o !== l) expect(overlaps(l.rect, o.rect), `"${l.text}" overlaps "${o.text}"`).toBe(false);
+  }
+  return labels;
+};
+
+test('labels change with the zoom level and never cover each other or the interface', async ({ page }) => {
+  await ready(page, '/constelacion');
+  await page.waitForTimeout(2200);
+  const far = await checkLabels(page);
+  expect(far.length).toBeGreaterThanOrEqual(4);
+  expect(far.every((l) => l.kind === 'theme')).toBe(true);
+
+  await api(page, (c) => c.zoom(100));
+  await expect.poll(async () => (await api(page, (c) => c.labels())).some((l) => l.kind === 'book')).toBe(true);
+  await checkLabels(page);
+
+  await api(page, (c) => c.select('patron-oro'));
+  await expect(page.locator('#panel h2')).toHaveText('Patrón oro');
+  await page.waitForTimeout(1500);
+  const near = await checkLabels(page);
+  expect(near.some((l) => l.kind === 'focus' && l.text === 'Patrón oro')).toBe(true);
+  expect(near.some((l) => l.kind === 'theme')).toBe(false);
+});
+
+test('the whole sky fits the first view, also on a phone', async ({ page, request }) => {
+  const meta = await (await request.get('/data/graph.json')).json();
+  await ready(page, '/constelacion');
+  await page.waitForTimeout(500);
+  expect(await api(page, (c) => c.onScreen())).toBeGreaterThan(meta.nodes * 0.97);
 });

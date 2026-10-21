@@ -43,6 +43,20 @@ async function main() {
   new App(g, sky, themeOf).start();
 }
 
+type Box = [left: number, top: number, right: number, bottom: number];
+type LabelKind = 'hover' | 'focus' | 'near' | 'nearBook' | 'book' | 'concept' | 'theme';
+
+/** Box height and maximum width of each kind of label; the look is in constelacion.astro. */
+const LABEL_STYLE: Record<LabelKind, { cls: string; h: number; max: number }> = {
+  theme: { cls: 'theme', h: 16, max: 400 },
+  book: { cls: 'book', h: 16, max: 280 },
+  nearBook: { cls: 'near book', h: 15, max: 270 },
+  concept: { cls: 'concept', h: 14, max: 250 },
+  near: { cls: 'near', h: 14, max: 250 },
+  focus: { cls: 'focus', h: 24, max: 300 },
+  hover: { cls: 'hover', h: 22, max: 280 },
+};
+
 interface Tour {
   book: number;
   stops: number[];
@@ -57,8 +71,13 @@ class App {
   private pointer = { x: 0, y: 0, inside: false, moved: false, downX: 0, downY: 0, down: false };
   private flight: { t: number; start: number; from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3 } | null = null;
   private screen = new Float32Array(0);
-  private labels: HTMLElement[] = [];
+  private labelEls = new Map<string, HTMLElement>();
+  private widths = new Map<string, number>();
+  private measurer = labelLayer.appendChild(document.createElement('div'));
+  private blocked: Box[] = [];
+  private blockedAt = 0;
   private lastInteraction = performance.now();
+  private touched = false;
   private intro = reducedMotion ? 1 : 0;
   private startedAt = performance.now();
   private quality = 0;
@@ -89,10 +108,15 @@ class App {
     this.bindKeys();
     this.sky.controls.addEventListener('start', () => {
       this.flight = null;
+      this.touched = true;
       this.lastInteraction = performance.now();
     });
     window.addEventListener('hashchange', () => this.openFromHash());
     root.dataset.state = 'ready';
+    // Widths measured before a font finished loading are wrong: measure again once it has.
+    document.fonts.addEventListener('loadingdone', () => this.widths.clear());
+    document.fonts.ready.then(() => this.widths.clear());
+    window.addEventListener('resize', () => (this.blockedAt = 0));
     this.openFromHash();
     this.applyVisibility();
     this.sky.renderer.setAnimationLoop((t) => this.frame(t));
@@ -101,6 +125,23 @@ class App {
       select: (slug: string) => this.select(this.g.indexOf.get(slug) ?? -1),
       visibleStars: () => this.sky.alpha.reduce((n, a) => n + (a > 0.5 ? 1 : 0), 0),
       fps: () => this.fpsWindow.fps,
+      labels: () =>
+        [...this.labelEls.values()]
+          .filter((el) => el.classList.contains('on'))
+          .map((el) => ({ text: el.textContent, kind: el.className.replace(/\b(label|on)\b/g, '').trim(), rect: el.getBoundingClientRect().toJSON() })),
+      onScreen: () => {
+        let n = 0;
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        for (let i = 0; i < this.g.count; i++) {
+          const x = this.screen[i * 3], y = this.screen[i * 3 + 1];
+          if (this.screen[i * 3 + 2] > 0 && x >= 0 && x <= w && y >= 0 && y <= h) n++;
+        }
+        return n;
+      },
+      zoom: (distance: number) => {
+        const { camera, controls } = this.sky;
+        camera.position.sub(controls.target).setLength(distance).add(controls.target);
+      },
       quality: () => this.quality,
       starScreen: (slug: string) => {
         const i = this.g.indexOf.get(slug)!;
@@ -160,6 +201,17 @@ class App {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (w && h) this.sky.resize(w, h);
     this.updateViewOffset();
+    if (!this.touched && this.focus < 0) this.frameWholeSky();
+  }
+
+  /** Until the visitor moves the camera, keep the whole sky in view whatever the screen shape. */
+  private frameWholeSky() {
+    const { camera, controls } = this.sky;
+    const radius = 78; // stars reach ±60 plus the glow of the theme nebulae
+    const vfov = THREE.MathUtils.degToRad(camera.fov) / 2;
+    const hfov = Math.atan(Math.tan(vfov) * camera.aspect);
+    const dist = Math.max(155, radius / Math.tan(Math.min(vfov, hfov)));
+    camera.position.sub(controls.target).setLength(dist).add(controls.target);
   }
 
   /** Centre the view on the part of the screen the reading panel leaves free. */
@@ -188,6 +240,7 @@ class App {
       return;
     }
     history.replaceState(null, '', `#${this.g.slugs[i]}`);
+    this.touched = true;
     if (opts.fly !== false) this.flyTo(i);
     this.openPanel(i);
   }
@@ -323,70 +376,144 @@ class App {
 
   // ---------------------------------------------------------------- labels (zoom levels)
 
-  private label(k: number): HTMLElement {
-    let el = this.labels[k];
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'label';
-      labelLayer.appendChild(el);
-      this.labels[k] = el;
-    }
-    return el;
-  }
-
+  /**
+   * Labels follow a star atlas: theme names in spaced small capitals at the centre of each galaxy,
+   * star names set beside their star in the colour of their theme. Each zoom level shows its own
+   * kind of label, labels never overlap each other or the interface, and they fade in and out.
+   */
   private drawLabels() {
     const { g } = this;
     const dist = this.sky.camera.position.distanceTo(this.sky.controls.target);
-    const placed: [number, number, number, number][] = [];
-    let k = 0;
-    const put = (text: string, x: number, y: number, cls: string, force = false, color?: string) => {
-      const w = text.length * (cls.includes('theme') ? 9.5 : 7) + 16, h = cls.includes('theme') ? 22 : 18;
-      const box: [number, number, number, number] = [x - w / 2, y - h - 10, x + w / 2, y - 6];
-      if (!force && placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) return;
-      placed.push(box);
-      const el = this.label(k++);
-      if (el.textContent !== text) el.textContent = text;
-      el.className = `label ${cls}`;
-      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -130%)`;
-      el.style.setProperty('--c', color ?? 'transparent');
-      el.hidden = false;
-    };
-    const at = (i: number) => [this.screen[i * 3], this.screen[i * 3 + 1]] as const;
-    const visible = (i: number) => this.screen[i * 3 + 2] > 0 && this.sky.alpha[i] > 0.5;
+    const now = performance.now();
+    if (now - this.blockedAt > 500) this.updateBlocked(now);
+    const placed: Box[] = [...this.blocked];
+    const shown = new Set<string>();
+    const fits = (b: Box) => b[0] > 4 && b[1] > 4 && b[2] < canvas.clientWidth - 4 && b[3] < canvas.clientHeight - 4 && !placed.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
 
-    if (this.hover >= 0 && visible(this.hover)) put(g.titles[this.hover], ...at(this.hover), 'hover', true, this.themes[g.themes[this.hover]].color);
+    /** A star label sits to the right of its star, vertically centred on it. */
+    const star = (i: number, kind: LabelKind, force = false) => {
+      if (this.screen[i * 3 + 2] <= 0 || this.sky.alpha[i] < 0.5) return;
+      const key = `s${i}`;
+      if (shown.has(key)) return;
+      const x = this.screen[i * 3], y = this.screen[i * 3 + 1];
+      const text = this.shortTitle(i, kind === 'focus' || kind === 'hover');
+      const style = LABEL_STYLE[g.kinds[i] === 0 && kind !== 'focus' && kind !== 'hover' ? (kind === 'near' ? 'nearBook' : 'book') : kind];
+      const w = Math.min(this.textWidth(text, `label ${style.cls}`), style.max);
+      const gap = Math.min(this.starRadius(i) * 0.55, 11) + 5;
+      const box: Box = [x + gap, y - style.h / 2, x + gap + w, y + style.h / 2];
+      if (!force && !fits(box)) return;
+      placed.push(box);
+      shown.add(key);
+      this.showLabel(key, text, `label ${style.cls}`, box[0], box[1], this.themes[g.themes[i]].color, w);
+    };
+
+    if (this.hover >= 0) star(this.hover, 'hover', true);
     if (this.focus >= 0) {
-      if (visible(this.focus) && this.focus !== this.hover) put(g.titles[this.focus], ...at(this.focus), 'focus', true, this.themes[g.themes[this.focus]].color);
-      const ns = [...neighbours(g, this.focus)].filter(visible).sort((a, b) => g.kinds[a] - g.kinds[b] || this.degree[b] - this.degree[a]);
-      for (const j of ns.slice(0, 40)) if (j !== this.hover) put(this.shortTitle(j), ...at(j), g.kinds[j] === 0 ? 'near book' : 'near');
+      star(this.focus, 'focus', true);
+      const ns = [...neighbours(g, this.focus)].sort((a, b) => g.kinds[a] - g.kinds[b] || this.degree[b] - this.degree[a]);
+      for (const j of ns.slice(0, 30)) star(j, 'near');
     } else {
-      // Level 1, far away: one label per theme at the centre of its galaxy.
-      if (dist > 70) {
+      // Level 1 (far): the galaxies by name. Level 2: their books. Level 3 (close): concepts.
+      if (dist > 95) {
         const v = new THREE.Vector3();
         this.sky.centroids.forEach((c, t) => {
           if (this.hidden.has(t)) return;
           v.copy(c).project(this.sky.camera);
           if (v.z > 1) return;
-          put(this.themes[t].name, (v.x * 0.5 + 0.5) * canvas.clientWidth, (-v.y * 0.5 + 0.5) * canvas.clientHeight, 'theme', false, this.themes[t].color);
+          const style = LABEL_STYLE.theme;
+          const text = this.themes[t].name.toUpperCase();
+          const w = this.textWidth(text, 'label theme');
+          const x = (v.x * 0.5 + 0.5) * canvas.clientWidth, y = (-v.y * 0.5 + 0.5) * canvas.clientHeight;
+          // Two galaxies can line up from some angles: try just below, then just above.
+          const box = [0, 20, -20]
+            .map((dy): Box => [x - w / 2, y + dy - style.h / 2, x + w / 2, y + dy + style.h / 2])
+            .find(fits);
+          if (!box) return;
+          placed.push(box);
+          shown.add(`t${t}`);
+          this.showLabel(`t${t}`, text, 'label theme', box[0], box[1], this.themes[t].color, w);
         });
       }
-      // Level 2: books. Level 3 (close): the concepts nearest the centre of the view.
-      if (dist < 150) for (const b of [...this.books].filter(visible).sort((a, c) => this.screen[a * 3 + 2] - this.screen[c * 3 + 2]).slice(0, 18)) put(this.shortTitle(b), ...at(b), 'book');
+      const cx = canvas.clientWidth / 2, cy = canvas.clientHeight / 2;
+      const central = (i: number) => Math.hypot(this.screen[i * 3] - cx, this.screen[i * 3 + 1] - cy) + this.screen[i * 3 + 2] * 2;
+      if (dist < 125) {
+        const books = this.books.filter((b) => this.screen[b * 3 + 2] > 0 && this.sky.alpha[b] > 0.5).sort((a, b) => central(a) - central(b));
+        for (const b of books.slice(0, dist < 60 ? 6 : 10)) star(b, 'book');
+      }
       if (dist < 55) {
-        const cx = canvas.clientWidth / 2, cy = canvas.clientHeight / 2;
-        const cand: [number, number][] = [];
-        for (let i = 0; i < g.count; i++) if (g.kinds[i] === 1 && visible(i)) cand.push([i, Math.hypot(this.screen[i * 3] - cx, this.screen[i * 3 + 1] - cy) + this.screen[i * 3 + 2] * 4]);
-        cand.sort((a, b) => a[1] - b[1]);
-        for (const [i] of cand.slice(0, 26)) put(g.titles[i], ...at(i), 'concept');
+        const cand: number[] = [];
+        for (let i = 0; i < g.count; i++) if (g.kinds[i] === 1 && this.screen[i * 3 + 2] > 0 && this.sky.alpha[i] > 0.5) cand.push(i);
+        cand.sort((a, b) => central(a) - central(b));
+        for (const i of cand.slice(0, 40)) star(i, 'concept');
       }
     }
-    for (; k < this.labels.length; k++) this.labels[k].hidden = true;
+
+    // Fade out labels that are no longer shown; drop them once they have faded.
+    for (const [key, el] of this.labelEls) {
+      if (shown.has(key)) continue;
+      if (el.classList.contains('on')) {
+        el.classList.remove('on');
+        el.dataset.off = String(now);
+      } else if (now - Number(el.dataset.off) > 600) {
+        el.remove();
+        this.labelEls.delete(key);
+      }
+    }
   }
 
-  /** Books are stored as "Author - Title"; on the sky the title alone reads better. */
-  private shortTitle(i: number) {
+  private showLabel(key: string, text: string, cls: string, x: number, y: number, color: string, width: number) {
+    let el = this.labelEls.get(key);
+    if (!el) {
+      el = document.createElement('div');
+      labelLayer.appendChild(el);
+      this.labelEls.set(key, el);
+    }
+    if (el.textContent !== text) el.textContent = text;
+    const full = `${cls} on`;
+    if (el.className !== full) el.className = full;
+    el.style.setProperty('--c', color);
+    el.style.width = `${Math.ceil(width)}px`;
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+  }
+
+  /**
+   * Natural width of a label, measured with a hidden element that has the label's own classes,
+   * so font loading, letter-spacing and padding are all accounted for. Cached per text.
+   */
+  private textWidth(text: string, cls: string) {
+    const key = `${cls}|${text}`;
+    let w = this.widths.get(key);
+    if (w === undefined) {
+      this.measurer.className = `${cls} measure`;
+      this.measurer.textContent = text;
+      w = this.measurer.getBoundingClientRect().width + 1;
+      this.widths.set(key, w);
+    }
+    return w;
+  }
+
+  /** Screen areas labels must not cover: the top bar, the legend, the hint and the panel. */
+  private updateBlocked(now: number) {
+    this.blockedAt = now;
+    const c = canvas.getBoundingClientRect();
+    this.blocked = ['.bar > *', '#legend button', '.hint', '#panel', '#debug']
+      .flatMap((sel) => [...document.querySelectorAll<HTMLElement>(sel)])
+      .filter((el) => !el.hidden && el.offsetParent !== null)
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width && r.height)
+      .map((r): Box => [r.left - c.left - 8, r.top - c.top - 6, r.right - c.left + 8, r.bottom - c.top + 6]);
+  }
+
+  /**
+   * Name shown on the sky. Books are stored as "Author - Title": the title alone reads better.
+   * Long concept names drop a trailing "(…)" gloss, e.g. "Ley de Reforma Fiscal de 1986 (Tax Reform Act)".
+   * Hover, focus and the panel always show the full name.
+   */
+  private shortTitle(i: number, full = false) {
     const t = this.g.titles[i];
-    return this.g.kinds[i] === 0 ? t.split(' - ').slice(1).join(' - ') || t : t;
+    if (this.g.kinds[i] === 0) return t.split(' - ').slice(1).join(' - ') || t;
+    if (full || t.length <= 30) return t;
+    return t.replace(/\s*\([^()]*\)$/, '') || t;
   }
 
   // ---------------------------------------------------------------- reading panel
@@ -421,6 +548,7 @@ class App {
     `;
     panel.hidden = false;
     root.dataset.panel = 'open';
+    this.blockedAt = 0;
     this.updateViewOffset();
     noteContent(slug)
       .then((note) => {
@@ -449,6 +577,7 @@ class App {
     panel.hidden = true;
     panel.innerHTML = '';
     delete root.dataset.panel;
+    this.blockedAt = 0;
     this.updateViewOffset();
   }
 

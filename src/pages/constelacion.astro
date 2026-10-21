@@ -1,5 +1,6 @@
 ---
 import 'katex/dist/katex.min.css';
+import '@fontsource-variable/hanken-grotesk/wght-italic.css';
 import Base from '../layouts/Base.astro';
 import { num } from '../lib/format';
 import { library } from '../lib/library';
@@ -55,12 +56,39 @@ const stars = report.books + report.concepts;
   .sky { position: relative; height: 100dvh; overflow: hidden; background: #05060d; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
   #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-  #labels :global(.label) { position: absolute; left: 0; top: 0; white-space: nowrap; font: 500 12px/1 var(--f-body); color: var(--ink-2); text-shadow: 0 1px 8px #000, 0 0 2px #000; will-change: transform; }
-  #labels :global(.label.theme) { font: 800 14px/1 var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
-  #labels :global(.label.theme)::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--c); box-shadow: 0 0 10px var(--c); vertical-align: 1px; }
-  #labels :global(.label.book) { font: 600 12.5px/1 var(--f-body); color: var(--ink); }
-  #labels :global(.label.concept), #labels :global(.label.near) { font-size: 11.5px; }
-  #labels :global(.label.hover), #labels :global(.label.focus) { font: 600 13px/1 var(--f-body); color: var(--ink); padding: 6px 9px; border-radius: 8px; background: rgb(8 9 20 / 0.86); border: 1px solid color-mix(in oklab, var(--c) 60%, transparent); text-shadow: none; z-index: 2; }
+  /* Labels (see LABEL_STYLE in src/constellation/app.ts for the matching metrics).
+     A star atlas: galaxy names in spaced small capitals, star names beside their star,
+     every name tinted with the colour of its theme. */
+  #labels :global(.label) {
+    position: absolute; left: 0; top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font: 400 10.5px/14px var(--f-body); letter-spacing: 0.01em;
+    color: color-mix(in oklab, var(--c) 38%, #c4c8de);
+    text-shadow: 0 0 3px #05060d, 0 0 10px rgb(5 6 13 / 0.9);
+    opacity: 0; transition: opacity 0.35s ease; will-change: transform, opacity;
+  }
+  #labels :global(.label.on) { opacity: 0.88; }
+  #labels :global(.label.measure) { visibility: hidden; opacity: 0; width: auto !important; max-width: none; transition: none; }
+  #labels :global(.label.theme) {
+    font: 600 11.5px/16px var(--f-display); letter-spacing: 0.3em; text-transform: uppercase; text-align: center; overflow: visible;
+    color: color-mix(in oklab, var(--c) 62%, #ffffff);
+    text-shadow: 0 0 14px color-mix(in oklab, var(--c) 75%, transparent), 0 0 3px #05060d;
+  }
+  #labels :global(.label.theme.on) { opacity: 0.95; }
+  #labels :global(.label.book) {
+    font: italic 500 12px/16px var(--f-body); letter-spacing: 0;
+    color: color-mix(in oklab, var(--c) 28%, #eef0f8);
+  }
+  #labels :global(.label.near.book) { font-size: 11.5px; line-height: 15px; }
+  #labels :global(.label.concept.on), #labels :global(.label.near.on) { opacity: 0.8; }
+  #labels :global(.label.focus), #labels :global(.label.hover) {
+    font: 600 12.5px/24px var(--f-body); letter-spacing: 0; padding: 0 9px; border-radius: 6px; text-shadow: none;
+    color: #f4f5fb; background: rgb(7 8 18 / 0.82);
+    border: 1px solid color-mix(in oklab, var(--c) 55%, transparent);
+    box-shadow: 0 0 18px color-mix(in oklab, var(--c) 28%, transparent);
+  }
+  #labels :global(.label.hover) { font-weight: 500; font-size: 12px; line-height: 22px; padding: 0 8px; z-index: 2; }
+  #labels :global(.label.focus.on), #labels :global(.label.hover.on) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #labels :global(.label) { transition: none; } }
 
   .bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgb(5 6 13 / 0.85), transparent); z-index: 3; }
   .brand { font: 700 15px/1 var(--f-display); text-decoration: none; white-space: nowrap; }
@@ -125,6 +153,7 @@ const stars = report.books + report.concepts;
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   @media (max-width: 720px) {
+    #labels :global(.label.theme) { font-size: 10.5px; letter-spacing: 0.16em; }
     .bar { flex-wrap: wrap; }
     .search { order: 3; flex-basis: 100%; max-width: none; }
     .list { margin-left: auto; }

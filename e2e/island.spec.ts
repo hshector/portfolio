@@ -1,0 +1,165 @@
+import { expect, test, type Page } from '@playwright/test';
+
+// The island is drawn with WebGL; CI renders it in software (SwiftShader), so these tests use the
+// light mode (?lite: little grass, no shadows) and drive it through window.__isla.
+
+type Isla = {
+  readyMs: number;
+  fps: number;
+  tier: string;
+  night: number;
+  here: string | null;
+  mode: string;
+  bull: { x: number; z: number; heading: number; speed: number; gait: Record<string, number> };
+  prints: number;
+  scared: number;
+  stars: number;
+  autopilot: number;
+  sound: boolean;
+  flocks: { x: number; z: number }[];
+  place(x: number, z: number, heading: number): void;
+};
+const isla = <T, A = unknown>(page: Page, fn: (i: Isla, a: A) => T, arg?: A) =>
+  page.evaluate(([src, a]) => new Function('i', 'a', `return (${src})(i, a)`)((window as unknown as { __isla: Isla }).__isla, a), [fn.toString(), arg] as const) as Promise<T>;
+const open = async (page: Page, url = '/?lite') => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  await page.goto(url);
+  await expect(page.locator('[data-island]')).toHaveAttribute('data-state', 'ready', { timeout: 60_000 });
+  return errors;
+};
+
+test.describe.configure({ timeout: 120_000 });
+
+test('the island opens on the home page, with the projects underneath', async ({ page }, info) => {
+  const errors = await open(page);
+  info.annotations.push({ type: 'island ready (ms)', description: String(await isla(page, (i) => i.readyMs)) });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Héctor Sanchis');
+  await expect(page.locator('.hint')).toBeVisible();
+  // the visitor arrives at the jetty, at sunset, and is welcomed
+  await expect(page.locator('[data-prompt-title]')).toHaveText('La isla de Héctor');
+  expect(await isla(page, (i) => i.night)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('skip links reach every project without playing', async ({ page }) => {
+  await open(page);
+  await page.locator('.skip summary').click();
+  for (const [name, href] of [['WarrenIA', '/warrenia'], ['Biblioteca', '/biblioteca'], ['Constelación', '/constelacion'], ['Sobre mí', '#sobre-mi']]) {
+    await expect(page.locator('.skip').getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
+  }
+});
+
+test('the bull walks with the keyboard, gallops with Shift and leaves hoofprints', async ({ page }, info) => {
+  test.skip(info.project.name === 'phone', 'keyboard');
+  await open(page);
+  await isla(page, (i) => i.place(-6, 0, Math.PI));
+  await page.locator('canvas.island-canvas').click();
+  await page.keyboard.down('w');
+  await expect.poll(() => isla(page, (i) => i.bull.gait.walk), { timeout: 30_000 }).toBeGreaterThan(0.9);
+  await page.keyboard.down('Shift');
+  await expect.poll(() => isla(page, (i) => i.bull.gait.gallop), { timeout: 60_000 }).toBeGreaterThan(0.9);
+  await page.keyboard.up('Shift');
+  await page.keyboard.up('w');
+  expect(await isla(page, (i) => i.bull.z)).toBeLessThan(-1);
+  expect(await isla(page, (i) => i.prints)).toBeGreaterThan(4);
+});
+
+test('a finger on the island brings up a joystick that moves the bull', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone', 'touch');
+  await open(page);
+  const z0 = await isla(page, (i) => i.bull.z);
+  const box = (await page.locator('canvas.island-canvas').boundingBox())!;
+  const x = box.x + box.width / 2, y = box.y + box.height * 0.7;
+  await page.evaluate(([x, y]) => {
+    const c = document.querySelector('canvas.island-canvas')!;
+    const ev = (t: string, yy: number) => c.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: yy, bubbles: true }));
+    ev('pointerdown', y); ev('pointermove', y - 45);
+  }, [x, y]);
+  await expect(page.locator('[data-joystick]')).toBeVisible();
+  await expect.poll(() => isla(page, (i) => i.bull.z), { timeout: 30_000 }).toBeLessThan(z0 - 1);
+});
+
+test('reaching the pavilion offers WarrenIA, and E goes in', async ({ page }, info) => {
+  test.skip(info.project.name === 'phone', 'keyboard');
+  await open(page);
+  await isla(page, (i) => i.place(-24, 7.5, -Math.PI / 2));
+  await expect(page.locator('[data-prompt-title]')).toHaveText('Pabellón WarrenIA');
+  await expect(page.locator('[data-prompt-go]')).toHaveAttribute('href', '/warrenia');
+  await page.locator('canvas.island-canvas').click();
+  await Promise.all([page.waitForURL('**/warrenia'), page.keyboard.press('e')]);
+});
+
+test('the observatory stands at night, under the stars of the library', async ({ page, request }) => {
+  const meta = await (await request.get('/data/graph.json')).json();
+  await open(page);
+  await isla(page, (i) => i.place(0, -30, Math.PI));
+  await expect.poll(() => isla(page, (i) => i.night), { timeout: 30_000 }).toBeGreaterThan(0.9);
+  await expect.poll(() => isla(page, (i) => i.stars), { timeout: 30_000 }).toBe(meta.nodes);
+  await expect(page.locator('[data-prompt-title]')).toHaveText('Observatorio · La biblioteca');
+  await expect(page.locator('[data-prompt-go]')).toHaveAttribute('href', '/constelacion');
+});
+
+test('the map sends the bull along the paths to a place', async ({ page }) => {
+  await open(page);
+  await isla(page, (i) => i.place(-4, 14, 0));
+  await page.locator('[data-map-open]').click();
+  await expect(page.locator('dialog[data-map]')).toBeVisible();
+  await page.locator('[data-go="taller"]').click();
+  await expect(page.locator('dialog[data-map]')).toBeHidden();
+  const d = () => isla(page, (i) => Math.hypot(i.bull.x - 26.5, i.bull.z - 10.5));
+  const d0 = await d();
+  expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
+  await expect.poll(d, { timeout: 60_000 }).toBeLessThan(d0 - 2);
+});
+
+test('birds take off when the bull comes close', async ({ page }) => {
+  await open(page);
+  // a flock pecking away from the bull (one near the jetty may already have flown off)
+  const m = (await isla(page, (i) => i.flocks.filter((f) => Math.hypot(f.x - i.bull.x, f.z - i.bull.z) > 15)))[0];
+  const before = await isla(page, (i) => i.scared);
+  await isla(page, (i, a) => i.place(a.x, a.z + 6, Math.PI), m);
+  await expect.poll(() => isla(page, (i) => i.scared), { timeout: 30_000 }).toBeGreaterThan(before);
+});
+
+test('sound stays off until the visitor turns it on', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __audioContexts: number; AudioContext: typeof AudioContext };
+    w.__audioContexts = 0;
+    const Real = w.AudioContext;
+    w.AudioContext = class extends Real { constructor(o?: AudioContextOptions) { super(o); w.__audioContexts++; } };
+  });
+  await open(page);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as unknown as { __audioContexts: number }).__audioContexts)).toBe(0);
+  await page.locator('[data-sound]').click();
+  await expect(page.locator('[data-sound]')).toHaveAttribute('aria-pressed', 'true');
+  expect(await isla(page, (i) => i.sound)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { __audioContexts: number }).__audioContexts)).toBe(1);
+});
+
+test('with reduced motion the island waits to be asked', async ({ browser }) => {
+  const page = await browser.newPage({ reducedMotion: 'reduce' });
+  await page.goto('/?lite');
+  await expect(page.locator('[data-island]')).toHaveAttribute('data-state', 'calm');
+  await expect(page.getByRole('link', { name: 'Ver los proyectos' })).toBeVisible();
+  await page.getByRole('button', { name: 'Entrar en la isla igualmente' }).click();
+  await expect(page.locator('[data-island]')).toHaveAttribute('data-state', 'ready', { timeout: 60_000 });
+  await page.close();
+});
+
+test('without WebGL the projects are still one click away', async ({ page }) => {
+  await page.addInitScript(() => {
+    const real = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+      return type.startsWith('webgl') ? null : (real as (...a: unknown[]) => unknown).call(this, type, ...rest);
+    } as typeof real;
+  });
+  await page.goto('/');
+  await expect(page.locator('[data-island]')).toHaveAttribute('data-state', 'nogl');
+  await expect(page.getByText('Tu navegador no puede mostrar la isla en 3D.')).toBeVisible();
+  await page.getByRole('link', { name: 'Ver los proyectos' }).click();
+  await expect(page.getByRole('heading', { name: 'WarrenIA' })).toBeInViewport();
+});

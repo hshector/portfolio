@@ -82,6 +82,7 @@ jobs:
             sleep 10
           done
           curl -fsS "$SITE/" | grep -q 'Héctor Sanchis' || { echo "::error::$SITE/ did not serve the home page"; exit 1; }
+          curl -fsS "$SITE/" | grep -q 'data-island' || { echo "::error::$SITE/ did not serve the island"; exit 1; }
           for path in /biblioteca /warrenia /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE$path")
             [ "$code" = 200 ] || { echo "::error::$SITE$path returned $code"; exit 1; }

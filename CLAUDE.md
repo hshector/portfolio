@@ -19,8 +19,8 @@ Portfolio de Héctor: una isla 3D explorable (a lomos de un toro realista) con d
 biblioteca de notas de lectura, que se recorre como una constelación. Plan completo:
 https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 
-- **Stack:** Astro (estático) + TypeScript. 3D con three.js. La constelación usa `WebGLRenderer` (medido, ver
-  `docs/CONSTELLATION.md`); para la isla hay que medir WebGL frente a WebGPU antes de elegir.
+- **Stack:** Astro (estático) + TypeScript. 3D con three.js y `WebGLRenderer` en la constelación y en la isla
+  (medido, ver `docs/CONSTELLATION.md` y `docs/ISLA.md`).
 - **Hosting:** Cloudflare Workers, solo ficheros estáticos (`wrangler.jsonc`). Gratis y sin límite de peticiones a estáticos.
 - **Vault:** repo privado `hshector/vault-libros`. `tematicas.yml` asigna cada libro a una temática y dice qué se
   publica: de los libros solo la ficha, el resumen ejecutivo y la lista de conceptos; de los conceptos, todo.
@@ -41,6 +41,15 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 - `/constelacion` (`src/pages/constelacion.astro` + `src/constellation/`): three.js `WebGLRenderer` (no
   WebGPU: ver `docs/CONSTELLATION.md`, con las mediciones). `/constelacion#<slug>` enfoca una nota.
 - `?debug` muestra fps y calidad. `window.__constellation` es la API que usan los tests E2E.
+
+## La isla (fase F3)
+
+- `/` es la isla (`src/pages/index.astro` + `src/island/`), con la página de proyectos debajo y versión sin 3D
+  (sin WebGL o con movimiento reducido). Decisiones, mediciones y créditos en `docs/ISLA.md`.
+- Toro: «bull walk cycle» de Lucy Greenhill (CC BY 4.0), en `assets-src/toro/`; `scripts/assets/toro.sh` genera
+  `src/assets/island/toro.glb`. El crédito tiene que seguir en el pie de la portada.
+- `?lite` (tests sin GPU), `?debug` (fps y calidad), `?calidad=alta|media|baja`. `window.__isla` es la API de los tests.
+- Sonido: solo sintetizado en el navegador, nunca empieza sin que el visitante lo active.
 
 ## Comandos
 

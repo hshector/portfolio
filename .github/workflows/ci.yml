@@ -78,11 +78,14 @@ jobs:
             [ "$i" = 6 ] && { echo "::error::$SITE/ did not serve the home page"; exit 1; }
             sleep 10
           done
-          for path in /biblioteca /warrenia /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
+          for path in /biblioteca /warrenia /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE$path")
             [ "$code" = 200 ] || { echo "::error::$SITE$path returned $code"; exit 1; }
           done
           test "$(curl -s -o /dev/null -w '%{http_code}' "$SITE/no-existe")" = 404
+          enc=$(curl -s -o /dev/null -H 'Accept-Encoding: br, gzip' -w '%header{content-encoding}' "$SITE/data/graph.json")
+          note=$(curl -s -o /dev/null -w '%{time_total}' "$SITE/biblioteca/bitcoin")
+          echo "::notice::graph.json content-encoding: ${enc:-none} · a note page loads in ${note}s from the runner"
           echo "::notice::Live at $SITE"
 
       - name: Upload pull request preview

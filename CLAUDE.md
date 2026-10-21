@@ -19,7 +19,8 @@ Portfolio de Héctor: una isla 3D explorable (a lomos de un toro realista) con d
 biblioteca de notas de lectura, que se recorre como una constelación. Plan completo:
 https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 
-- **Stack:** Astro (estático) + TypeScript. El 3D irá con three.js (WebGPURenderer + TSL) como isla de cliente.
+- **Stack:** Astro (estático) + TypeScript. 3D con three.js. La constelación usa `WebGLRenderer` (medido, ver
+  `docs/CONSTELLATION.md`); para la isla hay que medir WebGL frente a WebGPU antes de elegir.
 - **Hosting:** Cloudflare Workers, solo ficheros estáticos (`wrangler.jsonc`). Gratis y sin límite de peticiones a estáticos.
 - **Vault:** repo privado `hshector/vault-libros`. `tematicas.yml` asigna cada libro a una temática y dice qué se
   publica: de los libros solo la ficha, el resumen ejecutivo y la lista de conceptos; de los conceptos, todo.
@@ -34,6 +35,12 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
   (posiciones 3D precalculadas para la constelación de F2).
 - `scripts/check-dist.ts`: enlaces internos, que ningún libro publique sus notas privadas y límites de Cloudflare.
 - URLs: `/biblioteca/<slug>` para libros y conceptos, `/biblioteca/tema/<id>` para temáticas.
+
+## Constelación (fase F2)
+
+- `/constelacion` (`src/pages/constelacion.astro` + `src/constellation/`): three.js `WebGLRenderer` (no
+  WebGPU: ver `docs/CONSTELLATION.md`, con las mediciones). `/constelacion#<slug>` enfoca una nota.
+- `?debug` muestra fps y calidad. `window.__constellation` es la API que usan los tests E2E.
 
 ## Comandos
 

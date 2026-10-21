@@ -1,0 +1,136 @@
+---
+import 'katex/dist/katex.min.css';
+import Base from '../layouts/Base.astro';
+import { num } from '../lib/format';
+import { library } from '../lib/library';
+import { THEMES } from '../lib/themes';
+
+const { report, themes } = library();
+const shown = THEMES.filter((t) => themes.includes(t.name));
+const stars = report.books + report.concepts;
+---
+<Base
+  bare
+  title="Constelación · Biblioteca de Héctor Sanchis"
+  description={`Las ${num(stars)} notas de la biblioteca como un cielo en 3D: cada estrella es un libro o un concepto, y cada línea, un enlace entre ellos.`}
+>
+  <main class="sky" data-constellation data-state="loading">
+    <canvas id="sky" aria-label={`Constelación de ${num(stars)} notas. Usa el buscador o la vista en lista para navegar con el teclado.`}></canvas>
+    <div id="labels" aria-hidden="true"></div>
+
+    <header class="bar">
+      <a class="brand" href="/">Héctor Sanchis</a>
+      <div class="search" role="combobox" aria-haspopup="listbox" aria-owns="search-results">
+        <label class="sr" for="search">Buscar una nota</label>
+        <input id="search" type="search" placeholder="Busca un libro o un concepto  ( / )" autocomplete="off" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+        <ul id="search-results" role="listbox" aria-label="Resultados" hidden></ul>
+      </div>
+      <a class="list" href="/biblioteca">Vista en lista</a>
+    </header>
+
+    <nav id="legend" class="legend" aria-label="Mostrar u ocultar temáticas">
+      {shown.map((t) => (
+        <button type="button" data-theme={t.name} aria-pressed="true" style={`--c: ${t.color}`} data-mark={t.mark}><i aria-hidden="true"></i>{t.name}</button>
+      ))}
+    </nav>
+
+    <aside id="panel" class="panel" aria-label="Nota" aria-live="polite" hidden></aside>
+
+    <p class="hint">Arrastra para girar · rueda o pellizca para acercarte · toca una estrella</p>
+    <p class="loading" role="status">Encendiendo {num(stars)} estrellas…</p>
+    <div class="fallback">
+      <p>Tu navegador no puede mostrar la constelación en 3D.</p>
+      <a href="/biblioteca">Ver la biblioteca en lista</a>
+    </div>
+    <p id="debug" class="debug" hidden></p>
+    <noscript><div class="fallback show"><p>La constelación necesita JavaScript.</p><a href="/biblioteca">Ver la biblioteca en lista</a></div></noscript>
+  </main>
+</Base>
+
+<script>
+  import '../constellation/app';
+</script>
+
+<style>
+  .sky { position: relative; height: 100dvh; overflow: hidden; background: #05060d; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  #labels :global(.label) { position: absolute; left: 0; top: 0; white-space: nowrap; font: 500 12px/1 var(--f-body); color: var(--ink-2); text-shadow: 0 1px 8px #000, 0 0 2px #000; will-change: transform; }
+  #labels :global(.label.theme) { font: 800 14px/1 var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+  #labels :global(.label.theme)::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--c); box-shadow: 0 0 10px var(--c); vertical-align: 1px; }
+  #labels :global(.label.book) { font: 600 12.5px/1 var(--f-body); color: var(--ink); }
+  #labels :global(.label.concept), #labels :global(.label.near) { font-size: 11.5px; }
+  #labels :global(.label.hover), #labels :global(.label.focus) { font: 600 13px/1 var(--f-body); color: var(--ink); padding: 6px 9px; border-radius: 8px; background: rgb(8 9 20 / 0.86); border: 1px solid color-mix(in oklab, var(--c) 60%, transparent); text-shadow: none; z-index: 2; }
+
+  .bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgb(5 6 13 / 0.85), transparent); z-index: 3; }
+  .brand { font: 700 15px/1 var(--f-display); text-decoration: none; white-space: nowrap; }
+  .list { font-size: 13px; color: var(--ink-2); white-space: nowrap; text-underline-offset: 3px; }
+  .search { position: relative; flex: 1; max-width: 420px; margin-left: auto; }
+  .search input { width: 100%; font: 400 14px/1 var(--f-body); color: var(--ink); background: rgb(14 16 32 / 0.85); border: 1px solid rgb(255 255 255 / 0.16); border-radius: 10px; padding: 11px 13px; }
+  .search input::placeholder { color: var(--ink-3); }
+  .search input:focus { outline: 2px solid var(--dusk); outline-offset: 1px; }
+  #search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; list-style: none; margin: 0; padding: 6px; background: rgb(10 11 24 / 0.97); border: 1px solid rgb(255 255 255 / 0.14); border-radius: 12px; display: grid; gap: 2px; }
+  #search-results :global(li) { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  #search-results :global(li[aria-selected='true']), #search-results :global(li:hover) { background: rgb(255 255 255 / 0.08); }
+  #search-results :global(li span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #search-results :global(li small) { color: var(--ink-3); font-size: 12px; }
+  .sky :global(i[style*='--c']) { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); flex: none; display: inline-block; }
+  .sky :global(i[data-mark='ring']) { background: transparent; border: 2px solid var(--c); box-shadow: none; }
+
+  .legend { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 6px; z-index: 3; max-width: calc(100% - 32px); }
+  .legend button { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--f-body); color: var(--ink); background: rgb(14 16 32 / 0.85); border: 1px solid rgb(255 255 255 / 0.14); border-radius: 99px; padding: 8px 12px; cursor: pointer; }
+  .legend button i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .legend button[data-mark='ring'] i { background: transparent; border: 2px solid var(--c); box-shadow: none; }
+  .legend button[aria-pressed='false'] { opacity: 0.4; }
+  .legend button:hover { border-color: rgb(255 255 255 / 0.35); }
+
+  .panel { position: absolute; top: 70px; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; width: min(420px, calc(100% - 32px)); overflow: auto; overscroll-behavior: contain; z-index: 4; background: rgb(9 10 22 / 0.94); border: 1px solid rgb(255 255 255 / 0.12); border-radius: 16px; padding: 18px 20px 24px; display: grid; gap: 12px; align-content: start; backdrop-filter: blur(8px); }
+  .panel :global(.panel-top) { display: flex; justify-content: space-between; align-items: center; }
+  .panel :global(.kind) { font: 600 11px/1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
+  .panel :global(.close) { background: none; border: 1px solid var(--line); color: var(--ink-2); border-radius: 8px; padding: 6px 9px; cursor: pointer; }
+  .panel :global(h2) { font: 800 clamp(20px, 2.4vw, 26px)/1.1 var(--f-display); letter-spacing: -0.01em; outline: none; }
+  .panel :global(.byline) { color: var(--ink-2); font-size: 14px; }
+  .panel :global(.chip) { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 11px; border-radius: 99px; background: rgb(255 255 255 / 0.06); }
+  .panel :global(.chip i) { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .panel :global(.chip[data-mark='ring'] i) { background: transparent; border: 2px solid var(--c); box-shadow: none; }
+  .panel :global(.actions) { display: flex; flex-wrap: wrap; gap: 8px; }
+  .panel :global(.actions a), .panel :global(.actions button) { font: 500 13px/1 var(--f-body); color: var(--ink); text-decoration: none; background: rgb(255 255 255 / 0.07); border: 1px solid var(--line); border-radius: 99px; padding: 8px 12px; cursor: pointer; }
+  .panel :global(.tour) { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-2); background: rgb(165 151 255 / 0.12); border-radius: 10px; padding: 6px; }
+  .panel :global(.tour span) { flex: 1; }
+  .panel :global(.tour button) { background: rgb(255 255 255 / 0.08); color: var(--ink); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .panel :global(.tour button:disabled) { opacity: 0.35; cursor: default; }
+  .panel :global(.prose) { font-size: 15px; line-height: 1.65; overflow-wrap: break-word; }
+  .panel :global(.prose p), .panel :global(.prose ul), .panel :global(.prose ol) { margin: 0 0 0.9em; }
+  .panel :global(.prose ul), .panel :global(.prose ol) { padding-left: 1.2em; }
+  .panel :global(.prose h2) { font: 700 17px/1.3 var(--f-display); margin: 1.2em 0 0.5em; }
+  .panel :global(.prose a) { color: var(--ink); text-decoration-color: var(--dusk-2); text-underline-offset: 3px; }
+  .panel :global(.prose strong) { color: #fff; }
+  .panel :global(.prose .katex-display) { overflow-x: auto; overflow-y: hidden; }
+  .panel :global(.loading-text) { color: var(--ink-3); }
+  .panel :global(section h3) { font: 700 14px/1.2 var(--f-display); display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; }
+  .panel :global(section h3 span) { font: 500 12px/1 var(--f-mono); color: var(--ink-3); }
+  .panel :global(.links) { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .panel :global(.links a) { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; font-size: 13.5px; color: var(--ink-2); text-decoration: none; }
+  .panel :global(.links a:hover) { background: rgb(255 255 255 / 0.06); color: var(--ink); }
+  .panel :global(.more a) { font-size: 13px; color: var(--ink-2); }
+
+  .hint { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); margin: 0; font-size: 12px; color: var(--ink-3); z-index: 2; pointer-events: none; }
+  .sky[data-panel='open'] .hint { display: none; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: 500 15px/1 var(--f-body); color: var(--ink-2); pointer-events: none; transition: opacity 0.6s; }
+  .sky:not([data-state='loading']) .loading { opacity: 0; }
+  .fallback { position: absolute; inset: 0; display: none; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 24px; z-index: 5; background: #05060d; }
+  .fallback a { color: var(--ink); }
+  .sky[data-state='fallback'] .fallback, .fallback.show { display: grid; }
+  .debug { position: absolute; left: 16px; top: 70px; margin: 0; font: 500 12px/1.4 var(--f-mono); color: #9fe0b5; background: rgb(0 0 0 / 0.6); padding: 6px 9px; border-radius: 8px; z-index: 6; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 720px) {
+    .bar { flex-wrap: wrap; }
+    .search { order: 3; flex-basis: 100%; max-width: none; }
+    .list { margin-left: auto; }
+    .legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; right: 16px; }
+    .legend button { flex: none; }
+    .hint { display: none; }
+    .panel { top: auto; left: 12px; right: 12px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 58dvh; border-radius: 16px; }
+  }
+</style>

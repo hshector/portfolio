@@ -7,8 +7,10 @@ import '../styles/tokens.css';
 interface Props {
   title: string;
   description: string;
+  /** Full-screen pages (the constellation): no side gutter, no page scroll. */
+  bare?: boolean;
 }
-const { title, description } = Astro.props;
+const { title, description, bare = false } = Astro.props;
 ---
 <!doctype html>
 <html lang="es">
@@ -23,13 +25,14 @@ const { title, description } = Astro.props;
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
   </head>
-  <body>
+  <body class:list={{ bare }}>
     <slot />
   </body>
 </html>
 
 <style is:global>
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { background: var(--sky); }
   body {
     margin: 0;
@@ -42,6 +45,7 @@ const { title, description } = Astro.props;
     font: 400 var(--step-0) / 1.6 var(--f-body);
     padding-inline: var(--gutter) max(16px, env(safe-area-inset-right, 0px));
   }
+  body.bare { padding: 0; height: 100dvh; overflow: hidden; }
   h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
   p { margin: 0; }
   a { color: inherit; }

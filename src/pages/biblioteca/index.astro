@@ -27,6 +27,7 @@ const sections = THEMES.filter((t) => themes.includes(t.name)).map((theme) => {
         {report.books} libros, {num(report.concepts)} conceptos y {num(report.links)} conexiones entre ellos.
         Cada libro pertenece a una temática y cada concepto hereda la de los libros donde aparece.
       </p>
+      <a class="cta" href="/constelacion">Recorrerla como una constelación en 3D</a>
     </header>
 
     <section class="search" aria-label="Buscar en la biblioteca">
@@ -72,6 +73,8 @@ const sections = THEMES.filter((t) => themes.includes(t.name)).map((theme) => {
   .eyebrow { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
   h1 { font-size: var(--step-3); font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; }
   .lede { font-size: var(--step-1); color: var(--ink-2); }
+  .cta { justify-self: start; font-weight: 600; text-decoration: none; padding: 12px 18px; border-radius: 99px; color: #05060d; background: linear-gradient(120deg, var(--dusk), var(--dusk-2)); }
+  .cta:hover { filter: brightness(1.08); }
   .search { --pagefind-ui-scale: 0.9; --pagefind-ui-primary: var(--dusk); --pagefind-ui-text: var(--ink); --pagefind-ui-background: var(--sky-2); --pagefind-ui-border: rgb(255 255 255 / 0.16); --pagefind-ui-tag: rgb(255 255 255 / 0.08); --pagefind-ui-border-radius: 12px; --pagefind-ui-font: var(--f-body); }
   .search :global(.pagefind-ui__result-link) { color: var(--ink); }
   .search :global(.pagefind-ui__result-excerpt) { color: var(--ink-2); }

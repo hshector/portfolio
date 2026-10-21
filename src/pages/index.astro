@@ -35,8 +35,9 @@ import { THEMES } from '../lib/themes';
         <h2 id="b-title">Notas de lectura</h2>
         <p>
           {num(library.books)} libros y {num(library.concepts)} conceptos unidos por {num(library.links)} enlaces.
-          Pronto se podrán recorrer como una constelación.
+          Se pueden recorrer como una constelación en 3D.
         </p>
+        <a class="link" href="/constelacion">Ver la constelación</a>
         <a class="link" href="/biblioteca">Entrar en la biblioteca</a>
         <ul class="themes" aria-label="Temáticas">
           {THEMES.map((t) => <li data-mark={t.mark} style={`--c: ${t.color}`}><i aria-hidden="true"></i>{t.name}</li>)}

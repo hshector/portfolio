@@ -40,7 +40,10 @@ const description = note.kind === 'book'
         ) : (
           <h1 data-pagefind-meta="title">{note.title}</h1>
         )}
-        <span data-pagefind-filter="temática"><ThemeChip theme={theme} href={`/biblioteca/tema/${theme.id}`} /></span>
+        <div class="meta">
+          <span data-pagefind-filter="temática"><ThemeChip theme={theme} href={`/biblioteca/tema/${theme.id}`} /></span>
+          <a class="sky-link" href={`/constelacion#${note.slug}`} data-pagefind-ignore>Ver en la constelación</a>
+        </div>
       </header>
 
       {note.kind === 'book' && <h2 class="section">Resumen</h2>}
@@ -77,6 +80,9 @@ const description = note.kind === 'book'
   .kind { font: 600 var(--step--1) / 1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
   h1 { font-size: clamp(1.9rem, 1.4rem + 2.4vw, 3rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.015em; }
   .byline { color: var(--ink-2); }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .sky-link { font-size: var(--step--1); color: var(--ink-2); text-underline-offset: 3px; }
+  .sky-link:hover { color: var(--ink); }
   .muted { color: var(--ink-3); }
   .section { font: 700 var(--step-1) / 1.2 var(--f-display); display: flex; align-items: baseline; gap: 10px; }
   .count { font: 500 var(--step--1) / 1 var(--f-mono); color: var(--ink-3); }

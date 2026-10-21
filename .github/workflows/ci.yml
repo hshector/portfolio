@@ -51,6 +51,8 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Stamp the build with its commit
+        run: echo "$GITHUB_SHA" > dist/version.txt
       - run: npm run check:dist
 
       - run: npx playwright install --with-deps chromium
@@ -73,11 +75,13 @@ jobs:
         env:
           SITE: https://hector-portfolio.hectorsanchispont.workers.dev
         run: |
-          for i in 1 2 3 4 5 6; do
-            if curl -fsS "$SITE/" | grep -q 'Héctor Sanchis'; then break; fi
-            [ "$i" = 6 ] && { echo "::error::$SITE/ did not serve the home page"; exit 1; }
+          # Wait until the edge serves this very build, not the previous one.
+          for i in $(seq 1 24); do
+            if [ "$(curl -fsS "$SITE/version.txt?$i" || true)" = "$GITHUB_SHA" ]; then break; fi
+            [ "$i" = 24 ] && { echo "::error::$SITE still serves an older build after 4 minutes"; exit 1; }
             sleep 10
           done
+          curl -fsS "$SITE/" | grep -q 'Héctor Sanchis' || { echo "::error::$SITE/ did not serve the home page"; exit 1; }
           for path in /biblioteca /warrenia /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE$path")
             [ "$code" = 200 ] || { echo "::error::$SITE$path returned $code"; exit 1; }

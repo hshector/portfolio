@@ -110,9 +110,14 @@ test('WarrenIA opens on the screen of the pavilion, and the bull waits outside',
   await expect(page).toHaveURL(/#warrenia$/);
   await expect(demo.getByRole('note')).toContainText('Datos ficticios');
   // on a desktop the panel lies over the screen in the pavilion; on a phone it fills the screen
-  const box = (await demo.boundingBox())!, island = (await page.locator('[data-island]').boundingBox())!;
-  if (info.project.name === 'phone') expect(box.width).toBeGreaterThanOrEqual(island.width - 1);
-  else { expect(box.width).toBeGreaterThan(island.width * 0.6); expect(box.width).toBeLessThan(island.width); }
+  // (once its 0.45 s zoom-in has finished)
+  const island = (await page.locator('[data-island]').boundingBox())!;
+  const width = async () => (await demo.boundingBox())!.width;
+  if (info.project.name === 'phone') await expect.poll(width, { timeout: 10_000 }).toBeGreaterThanOrEqual(island.width - 1);
+  else {
+    await expect.poll(width, { timeout: 10_000 }).toBeGreaterThan(island.width * 0.6);
+    expect(await width()).toBeLessThan(island.width);
+  }
   await demo.getByRole('tab', { name: 'Radar' }).click();
   await expect(page).toHaveURL(/#warrenia\/radar$/);
   await expect(demo.locator('.w-list li').first()).toContainText('Empresa Demo');

@@ -1,54 +1,45 @@
 // The bull: "bull walk cycle" by Lucy Greenhill (Sketchfab, CC BY 4.0), recoloured black.
 //
 // The model is 0.134 units long, stands on y = 0 and faces -z; it is scaled to about 3.2 m and
-// turned to face +z. It only ships a walk cycle, so:
-// - trot and gallop are derived from it (gaits.ts) and blended by speed, all in step;
-// - standing still is two opposite moments of the walk mixed half and half, which puts the legs
-//   square under the body; on top of it the bull breathes, flicks its tail and turns its head
-//   towards nearby places.
-// Measured from the walk (21 Oct 2026): at normal speed the planted hooves slide back at
-// 0.026 model units/s, so that is the body's speed at timeScale 1.
+// turned to face +z. Its only clip is a walk, used here for one thing: its standing pose (two
+// opposite moments of the walk mixed half and half, which puts the legs square under the body).
+// Every gait is generated on top of that pose, every frame (locomotion.ts): walk, trot, canter and
+// gallop from a table of footfalls, with the hooves pinned where they land and the legs posed by
+// inverse kinematics. On top, the bull breathes, flicks its tail and turns its head towards
+// nearby places.
 
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { GAITS, deriveClip } from './gaits';
+import { Locomotion, type Ground } from './locomotion';
 
 export const BULL_SCALE = 24;
-/** Ground speed (m/s) of each gait at normal playback speed. */
-const NATURAL = { walk: 0.026 * BULL_SCALE, trot: 0.026 * BULL_SCALE * 1.25, gallop: 0.026 * BULL_SCALE * 1.5 };
-/** Speeds (m/s) where each gait takes over. */
-export const SPEED = { walk: 2.2, trot: 4.4, gallop: 7.8 };
-const HOOVES = ['front_l_standardpaw_jnt_017', 'front_r_standardpaw_jnt_022', 'back_l_standardpaw_jnt_032', 'back_r_standardpaw_jnt_037'];
+/** Ground speeds (m/s): a walk, and the top gallop. Anything between trots or canters. */
+export const SPEED = { walk: 1.5, gallop: 8.5 };
 const SHEEN_NIGHT = new THREE.Color(0x343f66);
 const STAND = 0.225; // with its opposite (0.725): the walk's most square-legged pair of moments
 
-export interface HoofPlant { x: number; z: number; leg: number; speed: number }
+export interface HoofPlant { x: number; y: number; z: number; leg: number; speed: number }
 
 export class Bull {
   readonly group = new THREE.Group();
-  /** Leans and bounces with the gait; the model sits inside. */
+  /** Raised, pitched and rolled by the gait; the model sits inside. */
   private readonly body = new THREE.Group();
-  private readonly mixer: THREE.AnimationMixer;
-  private readonly actions: Record<'standA' | 'standB' | 'walk' | 'trot' | 'gallop', THREE.AnimationAction>;
-  private readonly hooves: THREE.Object3D[];
+  private readonly pose: [THREE.Object3D, THREE.Vector3, THREE.Quaternion, THREE.Vector3][] = [];
+  private readonly loco: Locomotion;
   private readonly neck?: THREE.Object3D;
   private readonly head?: THREE.Object3D;
   private readonly chest?: THREE.Object3D;
   private readonly tail: THREE.Object3D[];
-  /** Bones the procedural motion turns, with their pose before it: reset every frame, because the
-   *  ones the walk clip doesn't animate would otherwise keep the previous frame's turn and drift. */
-  private readonly touched: [THREE.Object3D, THREE.Quaternion][] = [];
-  private phase = 0;
-  private readonly hoofLast = [0, 1, 2, 3].map(() => new THREE.Vector3());
-  private readonly hoofDown = [true, true, true, true];
-  private readonly lastPlant = [0, 0, 0, 0];
   private look = 0;
   private lookPitch = 0;
   private nextGlance = 3;
   private glance = 0;
-  readonly weights = { stand: 1, walk: 0, trot: 0, gallop: 0 };
+  /** The gait right now, for tests and the HUD: one of stand/walk/trot/canter/gallop is 1. */
+  readonly weights = { stand: 1, walk: 0, trot: 0, canter: 0, gallop: 0 };
   private readonly fur: THREE.MeshPhysicalMaterial;
+  /** Height at the withers, metres (measured from the mesh). */
+  readonly withers: number;
 
   constructor(asset: GLTF) {
     const model = cloneSkinned(asset.scene);
@@ -62,31 +53,51 @@ export class Bull {
     });
     model.scale.setScalar(BULL_SCALE);
     model.rotation.y = Math.PI;
-    model.position.z = -0.065 * BULL_SCALE; // centre the body on the group's origin
     this.body.add(model);
     this.group.add(this.body);
 
+    // the standing pose, once: two opposite moments of the walk, half and half
     const walk = asset.animations[0];
-    this.mixer = new THREE.AnimationMixer(model);
-    const clip = (c: THREE.AnimationClip) => {
-      const a = this.mixer.clipAction(c);
-      a.play(); a.timeScale = 0; a.weight = 0;
-      return a;
-    };
-    this.actions = {
-      standA: clip(walk.clone()), standB: clip(walk.clone()),
-      walk: clip(walk), trot: clip(deriveClip(walk, 'trot', GAITS.trot)), gallop: clip(deriveClip(walk, 'gallop', GAITS.gallop)),
-    };
-    this.actions.standA.time = STAND * walk.duration;
-    this.actions.standB.time = ((STAND + 0.5) % 1) * walk.duration;
+    const mixer = new THREE.AnimationMixer(model);
+    for (const at of [STAND, STAND + 0.5]) {
+      const a = mixer.clipAction(walk.clone());
+      a.play(); a.weight = 0.5; a.timeScale = 0; a.time = (at % 1) * walk.duration;
+    }
+    mixer.update(0);
+    model.traverse((o) => this.pose.push([o, o.position.clone(), o.quaternion.clone(), o.scale.clone()]));
+    // (stopping the mixer puts the rig back in its original pose, so the standing pose is
+    // restored from the snapshot just taken)
+    mixer.stopAllAction();
+    mixer.uncacheRoot(model);
+    this.restorePose();
+    // the walk carries the body forward, so centre the standing bull on the group's origin from
+    // its actual (skinned) shape, and stand it on y = 0
+    this.group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    model.position.z -= (box.min.z + box.max.z) / 2;
+    model.position.y -= box.min.y;
+    this.pose.find(([o]) => o === model)![1].copy(model.position);
 
     const get = (n: string) => model.getObjectByName(n) ?? undefined;
-    this.hooves = HOOVES.map((n) => get(n)!);
     this.neck = get('base_m_neck_jnt_024');
     this.head = get('base_m_head_jnt_025');
     this.chest = get('qspine_m_spine3ik_jnt_011');
     this.tail = ['chain_m_tail1_jnt_040', 'chain_m_tail2_jnt_041', 'chain_m_tail3_jnt_042'].map((n) => get(n)).filter((o): o is THREE.Object3D => !!o);
-    for (const b of [this.neck, this.head, this.chest, ...this.tail]) if (b) this.touched.push([b, b.quaternion.clone()]);
+    this.group.updateMatrixWorld(true);
+    // height at the withers (the top of the back above the forelegs), for the gait table's scale
+    const shoulder = model.getObjectByName('front_l_standardshoulder_jnt_014')!.getWorldPosition(new THREE.Vector3());
+    let withers = 0;
+    model.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh) return;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < m.geometry.attributes.position.count; i++) {
+        m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
+        if (Math.abs(v.z - shoulder.z) < 0.2 && Math.abs(v.x) < 0.2) withers = Math.max(withers, v.y);
+      }
+    });
+    this.withers = withers;
+    this.loco = new Locomotion(this.group, this.body, model, withers);
   }
 
   /** By moonlight the coat catches a cold sheen, so the black bull still reads on dark ground. */
@@ -94,59 +105,45 @@ export class Bull {
     this.fur.sheenColor.set(0x2c2622).lerp(SHEEN_NIGHT, THREE.MathUtils.smoothstep(n, 0.4, 1));
   }
 
+  /** After moving the bull by hand (teleport): plant its hooves under it. */
+  reset(ground: Ground) {
+    this.restorePose();
+    this.loco.reset(ground);
+  }
+
+  get gait() { return this.loco.gait; }
+  /** Size relative to the reference animal of the gait table (for tests). */
+  get gaitScale() { return this.loco.scale; }
+
   /**
-   * Advances the animation. speed is the bull's ground speed (m/s, negative when backing up),
-   * turn its turning rate (rad/s), lookAt a world point it may glance at when slow, or null.
-   * Calls onPlant for each hoof that lands.
+   * One frame. The caller has already placed group (position on the ground, heading).
+   * speed is the ground speed (m/s, negative when backing up), turn the turning rate (rad/s),
+   * lookAt a world point it may glance at when slow, or null. onPlant is called for each hoof
+   * that touches down, at the exact spot.
    */
-  update(dt: number, time: number, speed: number, turn: number, lookAt: THREE.Vector3 | null, onPlant: (p: HoofPlant) => void) {
-    const s = Math.abs(speed), w = this.weights;
-    // gait weights: stand → walk → trot → gallop, blended by speed
-    const ramp = (a: number, b: number) => THREE.MathUtils.clamp((s - a) / (b - a), 0, 1);
-    const moving = ramp(0.12, 0.7);
-    const toTrot = ramp(3.0, 4.4), toGallop = ramp(5.6, 7.2);
-    w.stand = 1 - moving;
-    w.gallop = moving * toGallop;
-    w.trot = moving * toTrot * (1 - toGallop);
-    w.walk = moving * (1 - toTrot);
-    const natural = (w.walk * NATURAL.walk + w.trot * NATURAL.trot + w.gallop * NATURAL.gallop) / Math.max(1e-3, moving) || NATURAL.walk;
-    const dur = this.actions.walk.getClip().duration;
-    // all gaits share one phase so they stay in step while blending
-    this.phase = (this.phase + (dt * Math.sign(speed || 1) * Math.min(s / natural, 9)) / dur + 1) % 1;
-    for (const k of ['walk', 'trot', 'gallop'] as const) { this.actions[k].time = this.phase * dur; this.actions[k].weight = w[k]; }
-    this.actions.standA.weight = this.actions.standB.weight = w.stand * 0.5;
-    for (const [b, q] of this.touched) b.quaternion.copy(q);
-    this.mixer.update(0);
-
-    // the body bounds when galloping and leans into turns
-    const bounce = w.gallop * 0.12 * Math.abs(Math.sin(this.phase * Math.PI * 2));
-    this.body.position.y = bounce;
-    this.body.rotation.x = w.gallop * 0.05 * Math.sin(this.phase * Math.PI * 2 + 1.2);
-    this.body.rotation.z = THREE.MathUtils.clamp(-turn * s * 0.02, -0.12, 0.12);
-
+  update(dt: number, time: number, speed: number, turn: number, lookAt: THREE.Vector3 | null, ground: Ground, onPlant: (p: HoofPlant) => void) {
+    this.restorePose();
     this.group.updateMatrixWorld(true);
-    this.idleLife(dt, time, w.stand, lookAt);
+    const downs = this.loco.update(dt, speed, turn, ground);
+    for (const d of downs) onPlant({ x: d.x, y: d.y, z: d.z, leg: d.leg, speed: Math.abs(speed) });
+    const g = this.loco.gait, s = Math.abs(speed);
+    const still = 1 - THREE.MathUtils.smoothstep(s, 0.05, 0.5);
+    for (const k of Object.keys(this.weights) as (keyof Bull['weights'])[]) this.weights[k] = 0;
+    this.weights[still > 0.5 ? 'stand' : g.name] = 1;
+    this.idleLife(dt, time, still, lookAt, g.tail);
+  }
 
-    // a hoof lands when it stops moving: report where (prints, dust, sound)
-    this.hooves.forEach((hoof, i) => {
-      const p = hoof.getWorldPosition(tmp);
-      const hoofSpeed = dt > 0 ? p.distanceTo(this.hoofLast[i]) / dt : 0;
-      this.hoofLast[i].copy(p);
-      const down = hoofSpeed < Math.max(0.35, s * 0.45);
-      if (s > 0.4 && down && !this.hoofDown[i] && time - this.lastPlant[i] > Math.max(0.12, 0.3 - s * 0.03)) {
-        this.lastPlant[i] = time;
-        onPlant({ x: p.x, z: p.z, leg: i, speed: s });
-      }
-      this.hoofDown[i] = down;
-    });
+  private restorePose() {
+    for (const [o, p, q, s] of this.pose) { o.position.copy(p); o.quaternion.copy(q); o.scale.copy(s); }
+    this.body.position.set(0, this.body.position.y, 0);
   }
 
   /** Breathing, tail flicks and head turns, stronger when standing still. */
-  private idleLife(dt: number, time: number, still: number, lookAt: THREE.Vector3 | null) {
+  private idleLife(dt: number, time: number, still: number, lookAt: THREE.Vector3 | null, tailLift: number) {
     this.group.getWorldQuaternion(qBody);
     side.set(1, 0, 0).applyQuaternion(qBody);
     if (this.chest) turnBone(this.chest, up, 0, side, Math.sin(time * 1.6) * 0.025 * (0.4 + still));
-    this.tail.forEach((b, i) => turnBone(b, up, Math.sin(time * 2.3 - i * 0.6) * 0.1 * still, side, 0));
+    this.tail.forEach((b, i) => turnBone(b, up, Math.sin(time * 2.3 - i * 0.6) * 0.1 * still * (1 - tailLift), side, 0));
     // where to look: a nearby place, or now and then a glance to the side
     this.nextGlance -= dt;
     if (this.nextGlance < 0) { this.glance = (Math.random() - 0.5) * 1.2; this.nextGlance = 3 + Math.random() * 5; }
@@ -157,7 +154,11 @@ export class Bull {
       const ang = Math.atan2(lookAt.x - tmp.x, lookAt.z - tmp.z) - heading;
       yaw = THREE.MathUtils.clamp(Math.atan2(Math.sin(ang), Math.cos(ang)), -0.9, 0.9);
     }
-    const pitch = still * (0.08 * Math.sin(time * 0.45) - 0.06); // a slow nod, head a little low
+    // standing: a slow nod, head a little low; moving: the head nods with the stride (twice per
+    // stride in the symmetric gaits, once in the canter and gallop) and stretches out at speed
+    const g = this.loco.gait, ph = this.loco.phase * Math.PI * 2;
+    const nod = g.name === 'walk' ? 0.06 * Math.sin(2 * ph) : g.name === 'trot' ? 0.025 * Math.sin(2 * ph) : 0.07 * Math.sin(ph + 1);
+    const pitch = still * (0.08 * Math.sin(time * 0.45) - 0.06) + (1 - still) * (nod - 0.08 * g.tail);
     const k = 1 - Math.exp(-dt * 2.5);
     this.look += (yaw * (0.35 + 0.65 * still) - this.look) * k;
     this.lookPitch += (pitch - this.lookPitch) * k;

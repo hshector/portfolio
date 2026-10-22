@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('home shows both projects without errors or sideways scroll', async ({ page }) => {
+// The page under the island is for visitors without 3D (here: reduced motion, before entering).
+test('home shows both projects without errors or sideways scroll', async ({ browser }) => {
+  const page = await browser.newPage({ reducedMotion: 'reduce' });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -14,6 +16,7 @@ test('home shows both projects without errors or sideways scroll', async ({ page
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
   expect(errors).toEqual([]);
+  await page.close();
 });
 
 test('fonts are self-hosted, not loaded from a third party', async ({ page }) => {

@@ -17,6 +17,9 @@ type Isla = {
   autopilot: number;
   sound: boolean;
   flocks: { x: number; z: number }[];
+  visit: string;
+  pavilion: string;
+  demoTab: string | null;
   place(x: number, z: number, heading: number): void;
 };
 const isla = <T, A = unknown>(page: Page, fn: (i: Isla, a: A) => T, arg?: A) =>
@@ -32,7 +35,7 @@ const open = async (page: Page, url = '/?lite') => {
 
 test.describe.configure({ timeout: 120_000 });
 
-test('the island opens on the home page, with the projects underneath', async ({ page }, info) => {
+test('the island opens on the home page, and is the whole site', async ({ page }, info) => {
   const errors = await open(page);
   info.annotations.push({ type: 'island ready (ms)', description: String(await isla(page, (i) => i.readyMs)) });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Héctor Sanchis');
@@ -41,15 +44,29 @@ test('the island opens on the home page, with the projects underneath', async ({
   await expect(page.locator('[data-prompt-title]')).toHaveText('La isla de Héctor');
   expect(await isla(page, (i) => i.night)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  // the page of projects underneath is only for the version without 3D
+  await expect(page.locator('#proyectos')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
-test('skip links reach every project without playing', async ({ page }) => {
+test('the skip menu goes to each place inside the island, never to another page', async ({ page }) => {
   await open(page);
-  await page.locator('.skip summary').click();
-  for (const [name, href] of [['WarrenIA', '/warrenia'], ['Biblioteca', '/biblioteca'], ['Constelación', '/constelacion'], ['Sobre mí', '#sobre-mi']]) {
-    await expect(page.locator('.skip').getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
+  const skip = page.locator('.skip');
+  await skip.locator('summary').click();
+  // (the hrefs are for the version without 3D)
+  for (const [name, href] of [['WarrenIA', '/warrenia'], ['La biblioteca (constelación)', '/constelacion'], ['Sobre mí', '#sobre-mi']]) {
+    await expect(skip.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
   }
+  await skip.getByRole('link', { name: 'Sobre mí', exact: true }).click();
+  await expect(page.locator('dialog[data-about]')).toBeVisible();
+  await expect(page).toHaveURL(/\/\?lite$/);
+  await page.locator('dialog[data-about]').getByRole('button', { name: 'Ir al Pabellón WarrenIA' }).click();
+  await expect(page.locator('dialog[data-about]')).toBeHidden();
+  expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
+  await skip.locator('summary').click();
+  await skip.getByRole('link', { name: 'WarrenIA', exact: true }).click();
+  await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('open');
+  await expect(page).toHaveURL(/\/\?lite#warrenia$/);
 });
 
 test('the bull walks with the keyboard, gallops with Shift and leaves hoofprints', async ({ page }, info) => {
@@ -82,14 +99,52 @@ test('a finger on the island brings up a joystick that moves the bull', async ({
   await expect.poll(() => isla(page, (i) => i.bull.z), { timeout: 30_000 }).toBeLessThan(z0 - 1);
 });
 
-test('reaching the pavilion offers WarrenIA, and E goes in', async ({ page }, info) => {
-  test.skip(info.project.name === 'phone', 'keyboard');
-  await open(page);
+test('WarrenIA opens on the screen of the pavilion, and the bull waits outside', async ({ page }, info) => {
+  const errors = await open(page);
   await isla(page, (i) => i.place(-24, 7.5, -Math.PI / 2));
   await expect(page.locator('[data-prompt-title]')).toHaveText('Pabellón WarrenIA');
-  await expect(page.locator('[data-prompt-go]')).toHaveAttribute('href', '/warrenia');
-  await page.locator('canvas.island-canvas').click();
-  await Promise.all([page.waitForURL('**/warrenia'), page.keyboard.press('e')]);
+  if (info.project.name === 'phone') await page.locator('[data-prompt-go]').click();
+  else { await page.locator('canvas.island-canvas').click(); await page.keyboard.press('e'); }
+  await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('open');
+  const demo = page.locator('[data-warrenia]');
+  await expect(demo).toBeVisible();
+  await expect(page).toHaveURL(/#warrenia$/);
+  await expect(demo.getByRole('note')).toContainText('Datos ficticios');
+  // on a desktop the panel lies over the screen in the pavilion; on a phone it fills the screen
+  const box = (await demo.boundingBox())!, vw = page.viewportSize()!;
+  if (info.project.name === 'phone') expect(box.width).toBeGreaterThanOrEqual(vw.width - 1);
+  else { expect(box.width).toBeGreaterThan(vw.width * 0.6); expect(box.width).toBeLessThan(vw.width); }
+  await demo.getByRole('tab', { name: 'Radar' }).click();
+  await expect(page).toHaveURL(/#warrenia\/radar$/);
+  await expect(demo.locator('.w-list li').first()).toContainText('Empresa Demo');
+  await demo.getByRole('button', { name: '← Volver al toro' }).click();
+  await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('island');
+  await expect(page).toHaveURL(/\/\?lite$/);
+  await expect(page.locator('[data-prompt-title]')).toHaveText('Pabellón WarrenIA');
+  expect(errors).toEqual([]);
+});
+
+test('a link to #warrenia/<tab> opens that tab in the pavilion, and Back leaves it', async ({ page }) => {
+  await open(page, '/?lite#warrenia/cartera');
+  await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('open');
+  expect(await isla(page, (i) => i.demoTab)).toBe('cartera');
+  await page.goBack();
+  await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('island');
+});
+
+test('from the observatory the visitor rises into the constellation, and comes back down', async ({ page }, info) => {
+  const errors = await open(page);
+  await isla(page, (i) => i.place(0, -30, Math.PI));
+  await expect(page.locator('[data-prompt-title]')).toHaveText('Observatorio · La biblioteca');
+  await page.locator('[data-prompt-go]').click();
+  await expect(page).toHaveURL(/#observatorio$/);
+  await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('sky');
+  await expect(page.locator('[data-constellation]')).toBeVisible();
+  await page.getByRole('button', { name: '← Volver al toro' }).click();
+  await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('island');
+  await expect(page).toHaveURL(/\/\?lite$/);
+  info.annotations.push({ type: 'visit', description: 'up and down' });
+  expect(errors).toEqual([]);
 });
 
 test('the observatory stands at night, under the stars of the library', async ({ page, request }) => {

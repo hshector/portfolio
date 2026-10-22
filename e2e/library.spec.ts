@@ -40,15 +40,20 @@ test('theme pages group concepts by letter', async ({ page }) => {
   await expect(page).toHaveURL(/#letra-B$/);
 });
 
-test('the WarrenIA page shows its demo screenshots', async ({ page }) => {
+test('the WarrenIA page runs the demo, with fictitious data and no advice', async ({ page }) => {
   await page.goto('/warrenia');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('WarrenIA');
-  const imgs = page.locator('.shots img');
-  await expect(imgs).toHaveCount(5);
-  for (const img of await imgs.all()) {
-    await img.scrollIntoViewIfNeeded();
-    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
-  }
+  const demo = page.locator('.wdemo');
+  await expect(demo.getByRole('note')).toContainText('Datos ficticios');
+  await expect(demo.getByRole('note')).toContainText('No es asesoramiento financiero');
+  await expect(demo.locator('.w-kpi')).toHaveText(/^[\d.]+\s€$/);
+  await demo.getByRole('tab', { name: 'Plan' }).click();
+  await expect(demo.getByText('Un rango, no una promesa')).toBeVisible();
+  await demo.getByRole('tab', { name: 'Radar' }).click();
+  await expect(demo.locator('.w-list li').first()).toContainText('Empresa Demo');
+  await demo.getByRole('tab', { name: 'Cartera' }).click();
+  await expect(demo.getByText('Impuesto estimado')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
 test('long formulas scroll inside the page instead of widening it', async ({ page }) => {

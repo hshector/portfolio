@@ -19,6 +19,7 @@
     "deploy:dry": "wrangler deploy --dry-run"
   },
   "dependencies": {
+    "@astrojs/sitemap": "3.7.4",
     "@fontsource-variable/bricolage-grotesque": "5.2.10",
     "@fontsource-variable/hanken-grotesk": "5.2.8",
     "@fontsource-variable/jetbrains-mono": "5.2.8",

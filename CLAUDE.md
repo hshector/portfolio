@@ -16,7 +16,8 @@ Todo tiene que ser gratis: hosting, herramientas, assets y dominios. Antes de pr
 # El proyecto
 
 Portfolio de Héctor: una isla 3D explorable (a lomos de un toro realista) con dos proyectos, WarrenIA y la
-biblioteca de notas de lectura, que se recorre como una constelación. Plan completo:
+biblioteca de notas de lectura, que se recorre como una constelación. La isla es toda la web: nada en ella
+lleva a otra página (las páginas HTML son el respaldo oculto para buscadores, sin 3D y enlaces directos). Plan completo:
 https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 
 - **Stack:** Astro (estático) + TypeScript. 3D con three.js y `WebGLRenderer` en la constelación y en la isla
@@ -44,8 +45,14 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 
 ## La isla (fase F3)
 
-- `/` es la isla (`src/pages/index.astro` + `src/island/`), con la página de proyectos debajo y versión sin 3D
+- `/` es la isla (`src/pages/index.astro` + `src/island/`). La página de proyectos de debajo solo se ve sin 3D
   (sin WebGL o con movimiento reducido). Decisiones, mediciones y créditos en `docs/ISLA.md`.
+- Pasos del toro: procedurales (`src/island/locomotion.ts`, tabla de pasos e IK); del clip solo se usa el reposo.
+- Observatorio (`observatory.ts`): sube a la constelación en el mismo lienzo. `#observatorio[/<nota>]`.
+- Pabellón (`pavilion.ts`): la demo de WarrenIA (`src/warrenia-demo/`, español, verde salvia, datos ficticios)
+  se abre sobre su pantalla. `#warrenia[/<pestaña>]`. Taller: tarjeta «Sobre mí» (`#sobre-mi`).
+- `vendor/warrenia/`: código de WarrenIA copiado con `scripts/warrenia/vendor.sh` (commit en su README); sus tests
+  corren con los nuestros. Para actualizar, vuelve a ejecutar el script con un checkout nuevo.
 - Toro: «bull walk cycle» de Lucy Greenhill (CC BY 4.0), en `assets-src/toro/`; `scripts/assets/toro.sh` genera
   `src/assets/island/toro.glb`. El crédito tiene que seguir en el pie de la portada.
 - `?lite` (tests sin GPU), `?debug` (fps y calidad), `?calidad=alta|media|baja`. `window.__isla` es la API de los tests.

@@ -7,15 +7,25 @@ import { loadGraph, neighbours, type GraphData } from './data';
 import { noteContent, prefetchNote } from './notes';
 import { createSky, type Sky } from './scene';
 
-const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
-const root = $<HTMLElement>('[data-constellation]');
-const canvas = $<HTMLCanvasElement>('#sky');
-const labelLayer = $<HTMLElement>('#labels');
-const panel = $<HTMLElement>('#panel');
-const searchInput = $<HTMLInputElement>('#search');
-const searchList = $<HTMLUListElement>('#search-results');
-const legend = $<HTMLElement>('#legend');
-const debugBox = $<HTMLElement>('#debug');
+// The interface (src/components/ConstellationUI.astro) is bound when the sky is mounted: on its own
+// page, or inside the island (mountConstellation), where it shares the island's canvas and renderer.
+let root: HTMLElement, canvas: HTMLCanvasElement, labelLayer: HTMLElement, panel: HTMLElement;
+let searchInput: HTMLInputElement, searchList: HTMLUListElement, legend: HTMLElement, debugBox: HTMLElement;
+function bind(rootEl: HTMLElement, canvasEl: HTMLCanvasElement) {
+  const $ = <T extends Element>(sel: string) => rootEl.querySelector<T>(sel)!;
+  root = rootEl;
+  canvas = canvasEl;
+  labelLayer = $('#labels');
+  panel = $('#panel');
+  searchInput = $('#search');
+  searchList = $('#search-results');
+  legend = $('#legend');
+  debugBox = $('#debug');
+}
+/** Inside the island, the sky only listens while it is showing. */
+let active = true;
+/** Inside the island, the URL is the island's: #observatorio and #observatorio/<note>. */
+let hashPrefix = '';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const debug = new URLSearchParams(location.search).has('debug');
@@ -32,15 +42,81 @@ function webglAvailable(): boolean {
   }
 }
 
-async function main() {
-  if (!webglAvailable()) {
+/** The stand-alone /constelacion page. */
+export async function startConstellationPage() {
+  bind(document.querySelector<HTMLElement>('[data-constellation]')!, document.querySelector<HTMLCanvasElement>('#sky')!);
+  try {
+    if (!webglAvailable()) {
+      root.dataset.state = 'fallback';
+      return;
+    }
+    const g = await loadGraph();
+    const themeOf = g.themeNames.map((name) => THEMES.find((t) => t.name === name)!);
+    const sky = createSky(canvas, g, themeOf.map((t) => ({ color: t.color, ring: t.mark === 'ring' })));
+    new App(g, sky, themeOf).start(true);
+  } catch (err) {
+    console.error(err);
     root.dataset.state = 'fallback';
-    return;
   }
+}
+
+export interface MountedSky {
+  /** Show the sky, with its camera where cameraStart() said, and take the input. */
+  enter(slug?: string): void;
+  /** Hide it and give the input back to the island. */
+  exit(): void;
+  /** Draw one frame (the island calls this while the sky is showing). */
+  frame(time: number): void;
+  /** Where the sky's camera starts (for the island's morph): position, rotation and field of view. */
+  cameraStart(): { position: THREE.Vector3; quaternion: THREE.Quaternion; fov: number };
+  /** Point size scale the sky uses (CSS px per size unit at distance 100). */
+  pointScale(): number;
+  sizes: Float32Array;
+  colors: THREE.Color[];
+  count: number;
+  positions: Float32Array;
+}
+
+/** The sky inside the island: same canvas and renderer, hidden until the visitor goes up the observatory. */
+export async function mountConstellation(rootEl: HTMLElement, canvasEl: HTMLCanvasElement, renderer: THREE.WebGLRenderer): Promise<MountedSky> {
+  bind(rootEl, canvasEl);
+  active = false;
+  hashPrefix = 'observatorio/';
   const g = await loadGraph();
   const themeOf = g.themeNames.map((name) => THEMES.find((t) => t.name === name)!);
-  const sky = createSky(canvas, g, themeOf.map((t) => ({ color: t.color, ring: t.mark === 'ring' })));
-  new App(g, sky, themeOf).start();
+  const sky = createSky(canvas, g, themeOf.map((t) => ({ color: t.color, ring: t.mark === 'ring' })), renderer);
+  const app = new App(g, sky, themeOf);
+  app.start(false);
+  sky.controls.enabled = false;
+  return {
+    enter(slug) {
+      active = true;
+      sky.controls.enabled = true;
+      root.hidden = false;
+      requestAnimationFrame(() => (root.dataset.state = 'ready'));
+      app.resetView();
+      if (slug) app.selectSlug(slug);
+      app.fadeGlowIn();
+    },
+    exit() {
+      app.selectSlug(null);
+      active = false;
+      sky.controls.enabled = false;
+      root.dataset.state = 'idle';
+      root.hidden = true;
+    },
+    frame: (t) => app.frame(t),
+    cameraStart() {
+      app.resetView();
+      sky.camera.updateMatrixWorld();
+      return { position: sky.camera.position.clone(), quaternion: sky.camera.quaternion.clone(), fov: sky.camera.fov };
+    },
+    pointScale: () => sky.scale(),
+    sizes: sky.size,
+    colors: g.themes.reduce((a: THREE.Color[], t, i) => { a[i] = new THREE.Color(themeOf[t].color).multiplyScalar(g.kinds[i] === 0 ? 1.15 : 1); return a; }, []),
+    count: g.count,
+    positions: g.positions,
+  };
 }
 
 type Box = [left: number, top: number, right: number, bottom: number];
@@ -81,6 +157,7 @@ class App {
   private intro = reducedMotion ? 1 : 0;
   private startedAt = performance.now();
   private quality = 0;
+  private ownLoop = true;
   private fpsWindow = { t: performance.now(), frames: 0, fps: 60 };
   private lastNoteMs = 0;
   private searchHits: number[] = [];
@@ -99,7 +176,9 @@ class App {
     this.books = [...Array(g.count).keys()].filter((i) => g.kinds[i] === 0);
   }
 
-  start() {
+  /** ownLoop: the stand-alone page draws its own frames; inside the island the island calls frame(). */
+  start(ownLoop: boolean) {
+    this.ownLoop = ownLoop;
     this.resize();
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.bindPointer();
@@ -111,15 +190,15 @@ class App {
       this.touched = true;
       this.lastInteraction = performance.now();
     });
-    window.addEventListener('hashchange', () => this.openFromHash());
-    root.dataset.state = 'ready';
+    window.addEventListener('hashchange', () => active && this.openFromHash());
+    if (ownLoop) root.dataset.state = 'ready';
     // Widths measured before a font finished loading are wrong: measure again once it has.
     document.fonts.addEventListener('loadingdone', () => this.widths.clear());
     document.fonts.ready.then(() => this.widths.clear());
     window.addEventListener('resize', () => (this.blockedAt = 0));
-    this.openFromHash();
+    if (ownLoop) this.openFromHash();
     this.applyVisibility();
-    this.sky.renderer.setAnimationLoop((t) => this.frame(t));
+    if (ownLoop) this.sky.renderer.setAnimationLoop((t) => this.frame(t));
     (window as unknown as { __constellation: unknown }).__constellation = {
       focus: () => (this.focus >= 0 ? this.g.slugs[this.focus] : null),
       select: (slug: string) => this.select(this.g.indexOf.get(slug) ?? -1),
@@ -152,7 +231,29 @@ class App {
 
   // ---------------------------------------------------------------- frame
 
-  private frame(time: number) {
+  /** The camera back to its starting pose, the whole sky in view. */
+  resetView() {
+    this.touched = false;
+    this.flight = null;
+    this.intro = 1;
+    this.sky.controls.target.set(0, 0, 0);
+    this.sky.camera.position.set(0, 25, 155);
+    this.resize();
+    this.sky.controls.update();
+  }
+
+  /** Links and nebulae light up over a second (the stars arrive first, from the island's sky). */
+  fadeGlowIn() {
+    this.glowFrom = performance.now();
+    this.sky.setGlow(0);
+  }
+  private glowFrom = 0;
+
+  selectSlug(slug: string | null) {
+    this.select(slug === null ? -1 : this.g.indexOf.get(slug) ?? -1);
+  }
+
+  frame(time: number) {
     const { controls, camera } = this.sky;
     if (this.intro < 1) {
       // Galaxies light up one after another over ~1.6 s, whatever the frame rate.
@@ -160,6 +261,11 @@ class App {
       this.applyVisibility();
     }
     if (this.flight) this.stepFlight();
+    if (this.glowFrom) {
+      const f = Math.min(1, (performance.now() - this.glowFrom) / 1200);
+      this.sky.setGlow(f);
+      if (f >= 1) this.glowFrom = 0;
+    }
     const idle = performance.now() - this.lastInteraction > 9000;
     controls.autoRotate = idle && this.focus < 0 && !reducedMotion;
     controls.autoRotateSpeed = 0.25;
@@ -181,7 +287,7 @@ class App {
       w.t = now;
       w.frames = 0;
       // Adaptive quality: after the intro, step down while the device stays under 45 fps.
-      if (now - this.startedAt > 3000 && w.fps < 45 && this.quality < 2) this.setQuality(this.quality + 1);
+      if (this.ownLoop && now - this.startedAt > 3000 && w.fps < 45 && this.quality < 2) this.setQuality(this.quality + 1);
       if (debug) {
         const info = this.sky.renderer.info.render;
         debugBox.hidden = false;
@@ -236,10 +342,10 @@ class App {
     this.applyVisibility();
     if (i < 0) {
       this.closePanel();
-      history.replaceState(null, '', location.pathname + location.search);
+      history.replaceState(null, '', location.pathname + location.search + (hashPrefix ? `#${hashPrefix.slice(0, -1)}` : ''));
       return;
     }
-    history.replaceState(null, '', `#${this.g.slugs[i]}`);
+    history.replaceState(null, '', `#${hashPrefix}${this.g.slugs[i]}`);
     this.touched = true;
     if (opts.fly !== false) this.flyTo(i);
     this.openPanel(i);
@@ -348,6 +454,7 @@ class App {
       this.pointer.y = e.clientY - r.top;
     };
     canvas.addEventListener('pointermove', (e) => {
+      if (!active) return;
       local(e);
       this.pointer.inside = true;
       this.pointer.moved = true;
@@ -358,13 +465,14 @@ class App {
       this.pointer.moved = true;
     });
     canvas.addEventListener('pointerdown', (e) => {
+      if (!active) return;
       local(e);
       this.pointer.down = true;
       this.pointer.downX = e.clientX;
       this.pointer.downY = e.clientY;
     });
     canvas.addEventListener('pointerup', (e) => {
-      if (!this.pointer.down) return;
+      if (!active || !this.pointer.down) return;
       this.pointer.down = false;
       if (Math.hypot(e.clientX - this.pointer.downX, e.clientY - this.pointer.downY) > 6) return;
       local(e);
@@ -497,7 +605,7 @@ class App {
     this.blockedAt = now;
     const c = canvas.getBoundingClientRect();
     this.blocked = ['.bar > *', '#legend button', '.hint', '#panel', '#debug']
-      .flatMap((sel) => [...document.querySelectorAll<HTMLElement>(sel)])
+      .flatMap((sel) => [...root.querySelectorAll<HTMLElement>(sel)])
       .filter((el) => !el.hidden && el.offsetParent !== null)
       .map((el) => el.getBoundingClientRect())
       .filter((r) => r.width && r.height)
@@ -539,12 +647,12 @@ class App {
       ${isBook ? `<p class="byline">${esc(g.titles[i].split(' - ')[0])}</p>` : ''}
       <p class="chip" data-mark="${theme.mark}" style="--c:${theme.color}"><i></i>${esc(theme.name)}</p>
       <div class="actions">
-        <a href="/biblioteca/${slug}">Abrir la página</a>
+        ${hashPrefix ? '' : `<a href="/biblioteca/${slug}">Abrir la página</a>`}
         ${isBook && linkedConcepts.length ? `<button type="button" data-action="tour">Recorrer este libro</button>` : ''}
       </div>
       <div class="prose" aria-busy="true"><p class="loading-text">Cargando la nota…</p></div>
       ${linkedBooks.length ? `<section><h3>${isBook ? 'Libros' : 'Aparece en'}</h3><ul class="links">${linkedBooks.map(item).join('')}</ul></section>` : ''}
-      ${linkedConcepts.length ? `<section><h3>${isBook ? 'Conceptos de este libro' : 'Conexiones'} <span>${fmt.format(linkedConcepts.length)}</span></h3><ul class="links">${linkedConcepts.slice(0, 40).map(item).join('')}</ul>${linkedConcepts.length > 40 ? `<p class="more"><a href="/biblioteca/${slug}">Ver las ${fmt.format(linkedConcepts.length)} en la página</a></p>` : ''}</section>` : ''}
+      ${linkedConcepts.length ? `<section><h3>${isBook ? 'Conceptos de este libro' : 'Conexiones'} <span>${fmt.format(linkedConcepts.length)}</span></h3><ul class="links">${linkedConcepts.slice(0, hashPrefix ? Infinity : 40).map(item).join('')}</ul>${!hashPrefix && linkedConcepts.length > 40 ? `<p class="more"><a href="/biblioteca/${slug}">Ver las ${fmt.format(linkedConcepts.length)} en la página</a></p>` : ''}</section>` : ''}
     `;
     panel.hidden = false;
     root.dataset.panel = 'open';
@@ -699,6 +807,7 @@ class App {
 
   private bindKeys() {
     window.addEventListener('keydown', (e) => {
+      if (!active) return;
       const typing = document.activeElement === searchInput;
       if (e.key === '/' && !typing) {
         e.preventDefault();
@@ -712,14 +821,10 @@ class App {
   }
 
   private openFromHash() {
-    const slug = decodeURIComponent(location.hash.slice(1));
+    const slug = decodeURIComponent(location.hash.slice(1)).slice(hashPrefix.length);
     if (!slug) return;
     const i = this.g.indexOf.get(slug);
     if (i !== undefined && i !== this.focus) this.select(i);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  root.dataset.state = 'fallback';
-});

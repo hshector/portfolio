@@ -1,13 +1,8 @@
 ---
-import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import { warrenia } from '../data/site';
-import inicio from '../assets/warrenia/desktop-inicio.png';
-import radar from '../assets/warrenia/desktop-radar.png';
-import cartera from '../assets/warrenia/desktop-cartera.png';
-import mInicio from '../assets/warrenia/mobile-inicio.png';
-import mFicha from '../assets/warrenia/mobile-ficha.png';
+import WarreniaDemo from '../components/WarreniaDemo.astro';
 
 // Facts from the WarrenIA README and docs/ARCHITECTURE.md.
 const features = [
@@ -43,15 +38,12 @@ const decisions = [
         <li><b>0 €</b> al mes</li>
         <li><b>PWA</b> instalable en el móvil</li>
       </ul>
-      <p class="note">La app real requiere acceso. Todas las capturas usan datos de demostración ficticios. Más adelante aquí habrá una demo interactiva con el propio código de WarrenIA.</p>
+      <a class="island-link" href="/#warrenia">Verlo dentro de la isla, en su pabellón</a>
+      <p class="note">La app real requiere acceso. La demo de abajo es la app de verdad en miniatura: el propio código de WarrenIA calculando, en tu navegador, una cartera, un plan y un radar inventados.</p>
     </header>
 
-    <section class="shots" aria-label="Capturas">
-      <figure class="wide"><Image src={inicio} alt="Inicio de WarrenIA con el valor de la cartera y la próxima aportación (datos de demostración)" widths={[720, 1440]} sizes="(min-width: 1040px) 1040px, 100vw" loading="eager" /><figcaption>Inicio: valor de la cartera y reparto de la próxima aportación.</figcaption></figure>
-      <figure><Image src={radar} alt="Momentum Radar con activos de demostración ordenados por puntuación" widths={[720, 1440]} sizes="(min-width: 1040px) 520px, 100vw" /><figcaption>Momentum Radar.</figcaption></figure>
-      <figure><Image src={cartera} alt="Cartera con la evolución del valor, TWR y TIR (datos de demostración)" widths={[720, 1440]} sizes="(min-width: 1040px) 520px, 100vw" /><figcaption>Cartera con TWR y TIR.</figcaption></figure>
-      <figure class="phone"><Image src={mInicio} alt="WarrenIA en el móvil: inicio" widths={[390, 780]} sizes="260px" /><figcaption>En el móvil.</figcaption></figure>
-      <figure class="phone"><Image src={mFicha} alt="WarrenIA en el móvil: ficha de un activo de demostración" widths={[390, 780]} sizes="260px" /><figcaption>Ficha de un activo.</figcaption></figure>
+    <section class="demo" aria-label="Demo de WarrenIA">
+      <WarreniaDemo variant="page" />
     </section>
 
     <section aria-labelledby="f-title">
@@ -78,6 +70,11 @@ const decisions = [
   </main>
 </Base>
 
+<script>
+  import { mountDemo } from '../warrenia-demo/ui';
+  mountDemo(document.querySelector<HTMLElement>('[data-warrenia]')!);
+</script>
+
 <style>
   main { max-width: 1040px; margin: 0 auto; padding-block: 40px 96px; display: grid; gap: 56px; }
   .hero { display: grid; gap: 16px; max-width: 48rem; }
@@ -89,12 +86,8 @@ const decisions = [
   .facts b { color: var(--ink); font-family: var(--f-mono); }
   .note { font-size: var(--step--1); color: var(--ink-3); }
   h2 { font: 700 var(--step-1) / 1.2 var(--f-display); margin-bottom: 18px; }
-  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) repeat(2, minmax(0, 0.5fr)); gap: 16px; align-items: start; }
-  .shots figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
-  .shots .wide { grid-column: 1 / -1; }
-  .shots img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); display: block; }
-  figcaption { font-size: var(--step--1); color: var(--ink-3); }
-  @media (max-width: 760px) { .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); } .shots figure:not(.phone) { grid-column: 1 / -1; } }
+  .demo { min-width: 0; }
+  .island-link { justify-self: start; color: var(--ink); text-underline-offset: 4px; }
   .features, .decisions { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
   .features div, .decisions div { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; }
   dt { font-weight: 600; margin-bottom: 6px; }

@@ -28,6 +28,10 @@ export interface Sky {
   setEdgeVisibility(visible: (a: number, b: number) => number, opacity: number): void;
   setHighlight(center: number, others: ArrayLike<number>): void;
   render(): void;
+  /** Point size scale: CSS px per size unit at distance 100, times the pixel ratio. */
+  scale(): number;
+  /** Fades the links and nebulae (0…1); the stars are not affected. */
+  setGlow(f: number): void;
   resize(width: number, height: number): void;
   dispose(): void;
 }
@@ -81,11 +85,13 @@ function radialTexture(): THREE.Texture {
   return tex;
 }
 
-export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTheme[]): Sky {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !new URLSearchParams(location.search).has('noaa'), powerPreference: 'high-performance' });
-  renderer.setClearColor(SKY, 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
+/** shared: draw with another renderer (the island's), on its canvas, without changing its settings. */
+export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTheme[], shared?: THREE.WebGLRenderer): Sky {
+  const renderer = shared ?? new THREE.WebGLRenderer({ canvas, antialias: !new URLSearchParams(location.search).has('noaa'), powerPreference: 'high-performance' });
+  if (!shared) {
+    renderer.setClearColor(SKY, 1);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  }
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(SKY, 0.0045);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
@@ -202,6 +208,7 @@ export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTh
   dustGeo.setAttribute('position', new THREE.BufferAttribute(dust, 3));
   const dustMat = new THREE.PointsMaterial({ color: 0x8c93bf, size: 1.4, sizeAttenuation: false, transparent: true, opacity: 0.5, depthWrite: false, fog: false });
   scene.add(new THREE.Points(dustGeo, dustMat));
+  let glowF = 1, edgeOpacity = 0.11, nebulaOpacity = 0.1;
 
   return {
     renderer,
@@ -214,6 +221,12 @@ export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTh
     commitAlpha() {
       alphaAttr.needsUpdate = true;
     },
+    setGlow(f) {
+      glowF = f;
+      edgeMat.opacity = edgeOpacity * f;
+      for (const s of nebulae) (s.material as THREE.SpriteMaterial).opacity = nebulaOpacity * f;
+      dustMat.opacity = 0.5 * f;
+    },
     setEdgeVisibility(visible, opacity) {
       for (let e = 0; e < edgeCount; e++) {
         const v = visible(eA[e], eB[e]);
@@ -221,8 +234,10 @@ export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTh
         eCol[e * 8 + 7] = v;
       }
       edgeColor.needsUpdate = true;
-      edgeMat.opacity = opacity;
-      for (const s of nebulae) (s.material as THREE.SpriteMaterial).opacity = opacity < 0.1 ? 0.04 : 0.1;
+      edgeOpacity = opacity;
+      nebulaOpacity = opacity < 0.1 ? 0.04 : 0.1;
+      edgeMat.opacity = edgeOpacity * glowF;
+      for (const s of nebulae) (s.material as THREE.SpriteMaterial).opacity = nebulaOpacity * glowF;
     },
     setHighlight(center, others) {
       highlight.geometry.dispose();
@@ -243,10 +258,17 @@ export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTh
       highlight.geometry = geo;
     },
     render() {
+      if (!shared) return renderer.render(scene, camera);
+      // the island draws with filmic tone mapping and its own exposure; the sky is drawn as on its page
+      const tm = renderer.toneMapping, ex = renderer.toneMappingExposure;
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.setClearColor(SKY, 1);
       renderer.render(scene, camera);
+      renderer.toneMapping = tm; renderer.toneMappingExposure = ex;
     },
+    scale: () => uScale.value,
     resize(width, height) {
-      renderer.setSize(width, height, false);
+      if (!shared) renderer.setSize(width, height, false);
       camera.aspect = width / Math.max(1, height);
       camera.updateProjectionMatrix();
       uScale.value = (Math.max(320, height) / 800) * renderer.getPixelRatio();
@@ -254,7 +276,7 @@ export function createSky(canvas: HTMLCanvasElement, g: GraphData, themes: SkyTh
     dispose() {
       controls.dispose();
       glow.dispose();
-      renderer.dispose();
+      if (!shared) renderer.dispose();
     },
   };
 }

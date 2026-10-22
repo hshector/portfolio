@@ -23,6 +23,8 @@ const KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowrig
 
 export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, handlers: InputHandlers) {
   const keys = new Set<string>();
+  /** Off while the island is not being played (up in the sky, inside the pavilion). */
+  let enabled = true;
   const steer: Steer = { forward: 0, turn: 0, run: 0, device: null };
   const typing = () => {
     const el = document.activeElement as HTMLElement | null;
@@ -30,7 +32,7 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
   };
 
   addEventListener('keydown', (e) => {
-    if (typing() || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!enabled || typing() || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (KEYS.includes(k)) {
       keys.add(k);
@@ -49,7 +51,7 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
   const drag = { id: -1, x0: 0, y0: 0, dx: 0, dy: 0, touch: false };
   const R = 56; // joystick radius in CSS px
   canvas.addEventListener('pointerdown', (e) => {
-    if (drag.id !== -1) return;
+    if (!enabled || drag.id !== -1) return;
     drag.id = e.pointerId; drag.x0 = e.clientX; drag.y0 = e.clientY; drag.dx = drag.dy = 0;
     drag.touch = e.pointerType !== 'mouse';
     steer.device = drag.touch ? 'touch' : 'mouse';
@@ -102,6 +104,7 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
     /** Reads every device; call once per frame. */
     poll(): Steer {
       let forward = 0, turn = 0, run = 0;
+      if (!enabled) { steer.forward = steer.turn = steer.run = 0; return steer; }
       const k = (a: string, b: string) => (keys.has(a) || keys.has(b) ? 1 : 0);
       forward = k('w', 'arrowup') - k('s', 'arrowdown');
       turn = k('a', 'arrowleft') - k('d', 'arrowright');
@@ -127,5 +130,9 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
       return steer;
     },
     active() { return steer.forward !== 0 || steer.turn !== 0; },
+    setEnabled(on: boolean) {
+      enabled = on;
+      if (!on) { keys.clear(); drag.id = -1; drag.dx = drag.dy = 0; joystick.hidden = true; }
+    },
   };
 }

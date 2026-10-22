@@ -1,4 +1,8 @@
 ---
+import 'katex/dist/katex.min.css';
+import '@fontsource-variable/hanken-grotesk/wght-italic.css';
+import ConstellationUI from '../components/ConstellationUI.astro';
+import WarreniaDemo from '../components/WarreniaDemo.astro';
 import { num } from '../lib/format';
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
@@ -25,15 +29,13 @@ const places = {
     <div class="joystick" data-joystick hidden><i></i></div>
 
     <header class="top">
-      <a class="brand" href="#proyectos">{author.name}</a>
+      <a class="brand" href="#sobre-mi" data-island-go="about">{author.name}</a>
       <details class="skip">
         <summary>Saltar a…</summary>
         <ul>
-          <li><a href="/warrenia">WarrenIA</a></li>
-          <li><a href="/biblioteca">Biblioteca</a></li>
-          <li><a href="/constelacion">Constelación</a></li>
-          <li><a href="#sobre-mi">Sobre mí</a></li>
-          <li><a href="#proyectos">Ver como página</a></li>
+          <li><a href="/warrenia" data-island-go="warrenia">WarrenIA</a></li>
+          <li><a href="/constelacion" data-island-go="observatorio">La biblioteca (constelación)</a></li>
+          <li><a href="#sobre-mi" data-island-go="about">Sobre mí</a></li>
         </ul>
       </details>
       <div class="tools">
@@ -67,6 +69,8 @@ const places = {
       <svg class="to-bull" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M20.5 3.5 3.8 10.3c-.7.3-.6 1.3.1 1.5l6.6 1.7 1.7 6.6c.2.7 1.2.8 1.5.1z" /></svg>
     </button>
 
+    <ConstellationUI variant="island" />
+    <WarreniaDemo variant="island" />
     <p class="debug" data-debug hidden></p>
     <p class="loading" role="status">Levantando la isla…</p>
 
@@ -83,10 +87,20 @@ const places = {
       <header><h2 id="map-title">Mapa de la isla</h2><form method="dialog"><button class="icon-btn" aria-label="Cerrar el mapa">✕</button></form></header>
       <canvas data-map-canvas width="440" height="440" aria-hidden="true"></canvas>
       <ul class="places">
-        <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button><a href="/warrenia">o abrir WarrenIA</a></li>
-        <li><button type="button" data-go="taller">Ir al Taller</button><a href="#sobre-mi">o leer «Sobre mí»</a></li>
-        <li><button type="button" data-go="observatorio">Ir al Observatorio</button><a href="/constelacion">o abrir la constelación</a></li>
+        <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button><a href="/warrenia" data-island-go="warrenia">o entrar ya</a></li>
+        <li><button type="button" data-go="taller">Ir al Taller</button><a href="#sobre-mi" data-island-go="about">o leer «Sobre mí»</a></li>
+        <li><button type="button" data-go="observatorio">Ir al Observatorio</button><a href="/constelacion" data-island-go="observatorio">o subir ya</a></li>
         <li><button type="button" data-go="muelle">Volver al muelle</button></li>
+      </ul>
+    </dialog>
+    <dialog class="map about-card" data-about aria-labelledby="about-card-title">
+      <header><h2 id="about-card-title">Taller · Sobre mí</h2><form method="dialog"><button class="icon-btn" aria-label="Cerrar">✕</button></form></header>
+      <p>Soy {author.name}. Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo: economía, finanzas, geopolítica, negocio e inteligencia artificial.</p>
+      <p>En la isla hay dos de esas cosas: WarrenIA, en el pabellón de cristal, y mi biblioteca de lectura, en el cielo del observatorio.</p>
+      <ul class="places">
+        <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button></li>
+        <li><button type="button" data-go="observatorio">Ir al Observatorio</button></li>
+        <li><a href={author.github}>Mi GitHub</a></li>
       </ul>
     </dialog>
     <noscript><div class="fallback show"><p>La isla en 3D necesita JavaScript.</p><a class="go" href="#proyectos">Ver los proyectos</a></div></noscript>
@@ -140,7 +154,7 @@ const places = {
         <p>
           Toro: «<a href="https://sketchfab.com/3d-models/bull-walk-cycle-d59e56bc90a34bcd826d02798a54ac96">bull walk cycle</a>» de
           <a href="https://sketchfab.com/Leafalu">Lucy Greenhill</a>,
-          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, recoloreado en negro y con trote y galope derivados.
+          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, recoloreado en negro; sus pasos se generan por código con la tabla de pasos de <a href="https://github.com/majidmanzarpour/threejs-procedural-animals">threejs-procedural-animals</a> (MIT).
           Letras: Bricolage Grotesque (SIL OFL 1.1). Sonido sintetizado en el navegador.
         </p>
         <a href={author.github}>GitHub</a>
@@ -229,6 +243,11 @@ const places = {
   .debug { position: absolute; left: 14px; bottom: 14px; font: 500 11px/1 var(--f-mono); color: rgb(244 245 251 / 0.7); pointer-events: none; }
   .loading { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 15px; text-shadow: 0 1px 10px rgb(0 0 0 / 0.4); pointer-events: none; transition: opacity 0.6s; }
   .island[data-state='ready'] .loading, .island[data-state='nogl'] .loading, .island[data-state='calm'] .loading { opacity: 0; }
+  /* up in the sky (or on the way): the island's controls step aside */
+  .island .top, .island .view, .island .hint { transition: opacity 0.5s ease; }
+  .island[data-visit]:not([data-visit='island']) :is(.top, .view, .hint, .prompt, .joystick) { opacity: 0; pointer-events: none; }
+  /* with the island running, everything happens in it: the page below is only for the version without 3D */
+  .island[data-state='ready'] ~ .page { display: none; }
   .island:not([data-state='ready']) .top .tools, .island:not([data-state='ready']) .view, .island:not([data-state='ready']) .hint { visibility: hidden; }
 
   .fallback { position: absolute; inset: 0; display: none; place-content: center; justify-items: center; gap: 16px; text-align: center; padding: 24px; color: #fff; }
@@ -246,6 +265,7 @@ const places = {
   .places button { font: 600 14px/1 var(--f-body); color: var(--ink); background: rgb(255 255 255 / 0.08); border: 1px solid var(--line); border-radius: 99px; padding: 10px 14px; cursor: pointer; }
   .places button:hover { background: rgb(255 255 255 / 0.14); }
   .places a { font-size: 13.5px; color: var(--ink-2); }
+  .about-card p { color: var(--ink-2); font-size: 15px; margin-bottom: 10px; }
 
   /* ---- the page under the island */
   .page main { max-width: 1040px; margin: 0 auto; padding-block: clamp(48px, 10vw, 120px) 64px; display: grid; gap: clamp(40px, 7vw, 80px); }

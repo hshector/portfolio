@@ -37,8 +37,12 @@ export interface World {
   /** Spinning things (windmill, sculpture): updated each frame. */
   update(dt: number, t: number, night: number): void;
   setGrassCount(n: number): void;
+  /** 0…1: hides the light beams and clouds (going up the observatory). */
+  setFade(f: number): void;
   /** Top-down picture of the island for the map (canvas, north up). */
   mapImage(): HTMLCanvasElement;
+  /** The WarrenIA pavilion's screen: where it is, and its picture (redraw, then call update). */
+  screen: { center: THREE.Vector3; normal: THREE.Vector3; width: number; height: number; canvas: HTMLCanvasElement; update(): void };
 }
 
 const TERRAIN = { sand: '#d8b888', wet: '#9c7f58', grassA: '#b8934a', grassB: '#93783d', rock: '#8d857c', path: '#c9a878' };
@@ -312,18 +316,44 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   boat.rotation.set(Math.PI / 2, 0, Math.PI); boat.position.set(JETTY.x + 3.2, 0.25, JETTY.z1 - 3);
   boat.castShadow = true; props.add(boat);
 
-  // WarrenIA: a glass pavilion with a slowly turning data sculpture inside (the momentum radar)
+  // WarrenIA: a glass pavilion in the app's sage green. On its back wall, facing the door, a big
+  // screen shows the app (drawn from the demo by src/warrenia-demo/screen.ts once the bull comes
+  // near); beside it a slowly turning data sculpture (the momentum radar).
   const w = SITES.warrenia, wy = height(w.x, w.z);
   const frame = mat(0x22252b);
-  const glass = new THREE.MeshStandardMaterial({ color: 0xbfe6e0, transparent: true, opacity: 0.24, roughness: 0.08, metalness: 0.2, depthWrite: false });
+  const sage = 0x9fd1ae;
+  const glass = new THREE.MeshStandardMaterial({ color: 0xcfe3d3, transparent: true, opacity: 0.22, roughness: 0.08, metalness: 0.2, depthWrite: false });
   box(10, 0.3, 7, mat(0xd8cdbb), w.x, wy + 0.15, w.z);
   const g1 = box(9.4, 4, 6.4, glass, w.x, wy + 2.3, w.z); g1.castShadow = false;
   for (const [dx, dz] of [[-4.7, -3.2], [4.7, -3.2], [-4.7, 3.2], [4.7, 3.2]]) box(0.2, 4.2, 0.2, frame, w.x + dx, wy + 2.4, w.z + dz);
   box(9.8, 0.25, 6.8, frame, w.x, wy + 4.4, w.z);
-  box(6, 0.1, 3.5, mat(0x0c1a12, 0x6ff2a8, 1.2), w.x, wy + 0.35, w.z);
+  box(6, 0.1, 3.5, mat(0x16241b, 0x8dbf9c, 0.9), w.x, wy + 0.35, w.z);
+  // the screen: 5.4 × 3.2 m (the demo panel's shape), its face looking east (+x), towards the door
+  const screenW = 5.4, screenH = 3.2;
+  const screenCenter = new THREE.Vector3(w.x - 4.3, wy + 2.25, w.z);
+  box(0.16, screenH + 0.24, screenW + 0.24, frame, screenCenter.x - 0.1, screenCenter.y, screenCenter.z);
+  const screenCanvas = document.createElement('canvas');
+  screenCanvas.width = 1080; screenCanvas.height = 640;
+  {
+    // until the demo is drawn: the app's sage nebula and its name
+    const c = screenCanvas.getContext('2d')!;
+    const g = c.createLinearGradient(0, 0, 1080, 640);
+    g.addColorStop(0, '#cfe3d3'); g.addColorStop(1, '#9cc2aa');
+    c.fillStyle = g; c.fillRect(0, 0, 1080, 640);
+    c.fillStyle = '#1f3a2b'; c.font = '700 96px system-ui, sans-serif'; c.textAlign = 'center';
+    c.fillText('WarrenIA', 540, 350);
+  }
+  const screenTex = new THREE.CanvasTexture(screenCanvas);
+  screenTex.colorSpace = THREE.SRGBColorSpace;
+  screenTex.anisotropy = 4;
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false, fog: false }));
+  screen.position.copy(screenCenter);
+  screen.rotation.y = Math.PI / 2;
+  props.add(screen);
   const sculpture = new THREE.Group();
-  sculpture.position.set(w.x, wy + 2.2, w.z);
-  const radarN = 140, radar = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: 0x7dffb4, emissiveIntensity: 1.6 }), radarN);
+  sculpture.position.set(w.x + 2.6, wy + 1.5, w.z - 1.9);
+  sculpture.scale.setScalar(0.45);
+  const radarN = 140, radar = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: sage, emissiveIntensity: 1.6 }), radarN);
   const ro = new THREE.Object3D();
   for (let i = 0; i < radarN; i++) {
     const a = (i / radarN) * Math.PI * 2 * 3, r = 0.4 + (i / radarN) * 1.6, y = Math.sin(a * 1.7) * 0.5;
@@ -331,7 +361,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   }
   sculpture.add(radar);
   for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7 + i * 0.6, 0.015, 6, 64), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: 0x7dffb4, emissiveIntensity: 0.9 }));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7 + i * 0.6, 0.015, 6, 64), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: sage, emissiveIntensity: 0.9 }));
     ring.rotation.x = Math.PI / 2; sculpture.add(ring);
   }
   scene.add(sculpture);
@@ -377,9 +407,9 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
 
   // ---------------------------------------------------------------- light beams over each place
   const beamMat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color('#ffd59a') } },
+    uniforms: { uColor: { value: new THREE.Color('#ffd59a') }, uFade: { value: 1 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform vec3 uColor; varying vec2 vUv; void main(){ gl_FragColor = vec4(uColor, (1.0 - vUv.y) * 0.35 * smoothstep(0.0, 0.5, 0.5 - abs(vUv.x - 0.5))); ${OUT} }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uFade; varying vec2 vUv; void main(){ gl_FragColor = vec4(uColor, (1.0 - vUv.y) * 0.35 * uFade * smoothstep(0.0, 0.5, 0.5 - abs(vUv.x - 0.5))); ${OUT} }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
   });
   for (const s of [SITES.warrenia, SITES.taller, SITES.observatorio]) {
@@ -485,7 +515,12 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
       (beamMat.uniforms.uColor.value as THREE.Color).set('#ffd59a').lerp(new THREE.Color('#9fc0ff'), night);
     },
     setGrassCount(n) { ig.instanceCount = Math.min(n, k); },
+    setFade(f) {
+      beamMat.uniforms.uFade.value = 1 - f;
+      for (const c of clouds) { (c.material as THREE.SpriteMaterial).opacity = 0.85 * (1 - f); c.visible = f < 0.999; }
+    },
     mapImage() { return drawMap(); },
+    screen: { center: screenCenter, normal: new THREE.Vector3(1, 0, 0), width: screenW, height: screenH, canvas: screenCanvas, update() { screenTex.needsUpdate = true; } },
   };
 }
 

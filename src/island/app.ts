@@ -17,6 +17,9 @@ import { createInput } from './input';
 import { blend, createLightUniforms, nightAt } from './palette';
 import { createShared } from './shaders';
 import { createLibrarySky } from './stars';
+import { createVisit } from './observatory';
+import { createPavilion } from './pavilion';
+import type { Tab } from '../warrenia-demo/ui';
 import {
   DOORS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
 } from './terrain';
@@ -82,7 +85,8 @@ export async function startIsland({ root, places }: IslandOptions) {
   const me = { ...start, speed: 0, turnRate: 0 };
   let mode: 'follow' | 'aerial' = 'follow';
   let autopilot: { x: number; z: number }[] = [];
-  let night = 0, here: SiteId | null = null, moved = false, stars: { count: number } | null = null, starsLoading = false;
+  let night = 0, here: SiteId | null = null, moved = false, stars: Awaited<ReturnType<typeof createLibrarySky>> | null = null;
+  let starsPromise: ReturnType<typeof createLibrarySky> | null = null;
   const obstacleGrid = new Map<string, { x: number; z: number; r: number }[]>();
   for (const ob of world.obstacles) {
     const key = `${Math.floor(ob.x / 8)},${Math.floor(ob.z / 8)}`;
@@ -100,15 +104,22 @@ export async function startIsland({ root, places }: IslandOptions) {
     hint: $('[data-hint]'), prompt: $('[data-prompt]'), promptTitle: $('[data-prompt-title]'), promptText: $('[data-prompt-text]'),
     promptGo: $<HTMLAnchorElement>('[data-prompt-go]'), sound: $<HTMLButtonElement>('[data-sound]'), view: $<HTMLButtonElement>('[data-view]'),
     mapBtn: $<HTMLButtonElement>('[data-map-open]'), map: $<HTMLDialogElement>('dialog[data-map]'), mapCanvas: $<HTMLCanvasElement>('[data-map-canvas]'),
-    joystick: $('[data-joystick]'), debug: $('[data-debug]'),
+    joystick: $('[data-joystick]'), debug: $('[data-debug]'), about: $<HTMLDialogElement>('dialog[data-about]'),
   };
   const mapImage = world.mapImage();
 
+  /** Nothing is going on: no trip up the observatory or into the pavilion. */
+  const idle = () => visit.state === 'island' && pav.state === 'island';
   function act() {
-    if (!here) return;
-    const p = places[here];
-    if (here === 'muelle') { openMap(); return; }
-    if (p.href) location.href = p.href;
+    if (!here || !idle()) return;
+    if (here === 'muelle') openMap();
+    else if (here === 'observatorio') goUp();
+    else if (here === 'warrenia') enterPavilion();
+    else openAbout();
+  }
+  function openAbout() {
+    if (ui.map.open) ui.map.close();
+    if (!ui.about.open) ui.about.showModal();
   }
   function openMap() {
     if (ui.map.open) { ui.map.close(); return; }
@@ -130,7 +141,26 @@ export async function startIsland({ root, places }: IslandOptions) {
     ui.sound.setAttribute('aria-label', audio.on ? 'Silenciar' : 'Activar el sonido');
     ui.sound.title = ui.sound.getAttribute('aria-label')!;
   });
-  ui.promptGo.addEventListener('click', (e) => { if (here === 'muelle') { e.preventDefault(); openMap(); } });
+  ui.promptGo.addEventListener('click', (e) => { e.preventDefault(); act(); });
+  // every link to a place (the "Saltar a…" menu, the map, the brand) goes there in the island;
+  // their hrefs are for the version without 3D
+  root.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLElement>('[data-island-go]');
+    if (!a) return;
+    e.preventDefault();
+    a.closest('details')?.removeAttribute('open');
+    if (ui.map.open) ui.map.close();
+    const where = a.dataset.islandGo;
+    if (ui.about.open && where !== 'about') ui.about.close();
+    if (where === 'warrenia') enterPavilion();
+    else if (where === 'observatorio') goUp();
+    else if (where === 'about') openAbout();
+  });
+  ui.about.addEventListener('click', (e) => {
+    const go = (e.target as HTMLElement).closest<HTMLElement>('[data-go]');
+    if (go) { goTo(go.dataset.go as SiteId); ui.about.close(); }
+    else if (e.target === ui.about) ui.about.close();
+  });
   ui.map.addEventListener('click', (e) => {
     const go = (e.target as HTMLElement).closest<HTMLElement>('[data-go]');
     if (go) { goTo(go.dataset.go as SiteId); ui.map.close(); }
@@ -207,12 +237,13 @@ export async function startIsland({ root, places }: IslandOptions) {
     const ahead = groundAt(me.x + Math.sin(me.heading) * 1.4, me.z + Math.cos(me.heading) * 1.4), behind = groundAt(me.x - Math.sin(me.heading) * 1.4, me.z - Math.cos(me.heading) * 1.4);
     bull.group.position.set(me.x, y, me.z);
     bull.group.rotation.set(0, me.heading, 0);
-    bull.group.rotateX(-Math.atan2(ahead - behind, 2.8));
+    // a gentle lean with the slope; the legs reach the ground themselves
+    bull.group.rotateX(-0.5 * Math.atan2(ahead - behind, 2.8));
     // glance at a place within 22 m when walking slowly or standing
     let near: SiteId | null = null, best = 22;
     for (const s of Object.values(SITES)) { const d = Math.hypot(s.x - me.x, s.z - me.z); if (d < best) { best = d; near = s.id; } }
     if (near) lookTarget.set(SITES[near].x, 0, SITES[near].z);
-    bull.update(dt, now, me.speed, me.turnRate, near && Math.abs(me.speed) < 1.5 ? lookTarget : null, (p) => {
+    bull.update(dt, now, me.speed, me.turnRate, near && Math.abs(me.speed) < 1.5 ? lookTarget : null, groundAt, (p) => {
       const surface = surfaceAt(p.x, p.z), gy = groundAt(p.x, p.z);
       if (surface !== 'wood' && gy > world.seaLevel) prints.stamp(p.x, gy, p.z, me.heading, now);
       if (surface !== 'wood' && surface !== 'stone') dust.puff(p.x, gy, p.z, now, (surface === 'grass' ? 0.6 : 1.2) * (1 + Math.min(3, p.speed / 2.5)));
@@ -254,8 +285,8 @@ export async function startIsland({ root, places }: IslandOptions) {
   }
 
   // ---------------------------------------------------------------- day → night
-  function updateLight(dt: number) {
-    const target = nightAt(me.x, me.z);
+  function updateLight(dt: number, forceNight = false) {
+    const target = forceNight ? 1 : nightAt(me.x, me.z);
     night += (target - night) * Math.min(1, dt * 1.5);
     const v = blend(light, night);
     world.sun.color.copy(light.sunColor.value);
@@ -269,19 +300,125 @@ export async function startIsland({ root, places }: IslandOptions) {
     for (const c of world.clouds) (c.material as THREE.SpriteMaterial).color.copy(v.cloud);
     ambient.setNight(night);
     bull.setNight(night);
-    if (night > 0.02 && !stars && !starsLoading) {
-      starsLoading = true;
-      createLibrarySky(shared, light.night).then((s) => { scene.add(s.points); stars = s; }).catch(() => { starsLoading = false; });
-    }
+    if (night > 0.02) loadStars().catch(() => undefined);
   }
+  function loadStars() {
+    starsPromise ??= createLibrarySky(shared, light.night).then((s) => { scene.add(s.points); stars = s; return s; });
+    starsPromise.catch(() => (starsPromise = null));
+    return starsPromise;
+  }
+
+  /** Where the follow camera would be now (to come back to after a visit). */
+  function visitFollowPose() {
+    const saved = mode; mode = 'follow'; cameraTarget(shared.time.value); mode = saved;
+    camPos.copy(want); camLook.copy(look);
+    return { position: want.clone(), look: look.clone() };
+  }
+
+  // ---------------------------------------------------------------- the observatory: up into the constellation
+  let skyPromise: Promise<import('../constellation/app').MountedSky> | null = null;
+  const skyRoot = root.querySelector<HTMLElement>('[data-constellation]')!;
+  function loadSky() {
+    skyPromise ??= import('../constellation/app').then((m) => m.mountConstellation(skyRoot, canvas, renderer));
+    return skyPromise;
+  }
+  const visit = createVisit({
+    camera,
+    stars: loadStars,
+    sky: loadSky,
+    followPose: () => visitFollowPose(),
+    onState(st) {
+      root.dataset.visit = st;
+      input.setEnabled(st === 'island');
+      if (st === 'island') { canvas.focus({ preventScroll: true }); updatePlace(true); }
+      else ui.prompt.hidden = true;
+    },
+  });
+  /** Up the observatory (from the door, or from a link to #observatorio[/note]). */
+  function goUp(slug?: string, instant = false) {
+    if (!idle()) return;
+    if (!instant) history.pushState(null, '', '#observatorio');
+    const d = DOORS.observatorio;
+    if (instant || Math.hypot(me.x - d.x, me.z - d.z) > 6) placeBull(d.x, d.z, Math.PI);
+    visit.go(slug, instant);
+  }
+  function goDown() {
+    if (visit.state !== 'sky') return;
+    visit.back(); // (closes the note first, which rewrites the hash)
+    if (location.hash.startsWith('#observatorio')) history.pushState(null, '', location.pathname + location.search);
+  }
+  skyRoot.querySelector('[data-sky-exit]')!.addEventListener('click', goDown);
+
+  // ---------------------------------------------------------------- the pavilion: into WarrenIA
+  const demoHost = root.querySelector<HTMLElement>('[data-warrenia]')!;
+  let screenDrawn = false;
+  function drawScreen() {
+    if (screenDrawn) return;
+    screenDrawn = true;
+    import('../warrenia-demo/screen').then((m) => { m.drawScreen(world.screen.canvas); world.screen.update(); }).catch(() => (screenDrawn = false));
+  }
+  let demoPromise: Promise<import('../warrenia-demo/ui').Demo> | null = null;
+  const pav = createPavilion({
+    camera, canvas, host: demoHost, screen: world.screen,
+    demo: () => (demoPromise ??= import('../warrenia-demo/ui').then((m) => m.mountDemo(demoHost, {
+      closeLabel: '← Volver al toro',
+      onClose: leavePavilion,
+      onTab: (t) => { if (location.hash.startsWith('#warrenia')) history.replaceState(null, '', t === 'inicio' ? '#warrenia' : `#warrenia/${t}`); },
+    }))),
+    followPose: () => visitFollowPose(),
+    onState(st) {
+      root.dataset.visit = st === 'island' ? 'island' : `pabellon-${st}`;
+      input.setEnabled(st === 'island');
+      if (st === 'island') { canvas.focus({ preventScroll: true }); updatePlace(true); }
+      else ui.prompt.hidden = true;
+    },
+  });
+  /** Into the pavilion (from its door, the menu, or a link to #warrenia[/tab]). */
+  function enterPavilion(tab?: Tab, instant = false) {
+    if (!idle()) return;
+    if (!instant) history.pushState(null, '', '#warrenia');
+    const d = DOORS.warrenia, w = SITES.warrenia;
+    if (instant || Math.hypot(me.x - d.x, me.z - d.z) > 6) placeBull(d.x, d.z, Math.atan2(w.x - d.x, w.z - d.z));
+    drawScreen();
+    pav.go(tab, instant);
+  }
+  function leavePavilion() {
+    if (pav.state !== 'open') return;
+    pav.back();
+    if (location.hash.startsWith('#warrenia')) history.pushState(null, '', location.pathname + location.search);
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && pav.state === 'open' && !(e.target as HTMLElement).closest?.('select')) leavePavilion(); });
+
+  // ---------------------------------------------------------------- links straight to a place
+  type Route = { to: 'sky'; slug?: string } | { to: 'warrenia'; tab?: Tab } | { to: 'about' } | null;
+  const TAB_NAMES = ['inicio', 'plan', 'radar', 'cartera'];
+  const route = (): Route => {
+    const sky = location.hash.match(/^#observatorio(?:\/(.+))?$/);
+    if (sky) return { to: 'sky', slug: sky[1] ? decodeURIComponent(sky[1]) : undefined };
+    const w = location.hash.match(/^#warrenia(?:\/(\w+))?$/);
+    if (w) return { to: 'warrenia', tab: TAB_NAMES.includes(w[1]) ? (w[1] as Tab) : undefined };
+    return location.hash === '#sobre-mi' ? { to: 'about' } : null;
+  };
+  addEventListener('popstate', () => {
+    const r = route();
+    if (r?.to !== 'sky' && visit.state === 'sky') visit.back();
+    if (r?.to !== 'warrenia' && pav.state === 'open') { pav.back(); }
+    if (r?.to === 'warrenia' && pav.state === 'open') pav.demo?.show(r.tab ?? 'inicio');
+    if (!r || !idle()) return;
+    if (r.to === 'sky') goUp(r.slug, true);
+    else if (r.to === 'warrenia') enterPavilion(r.tab, true);
+  });
+  // start loading the sky's code once the night begins, so going up is instant
+  let skyPreloaded = false;
   // ---------------------------------------------------------------- places
-  function updatePlace() {
+  function updatePlace(force = false) {
+    if (!idle()) return;
     let found: SiteId | null = null;
     for (const id of Object.keys(DOORS) as SiteId[]) {
       const d = DOORS[id];
       if (Math.hypot(me.x - d.x, me.z - d.z) < (id === 'muelle' ? 7 : 4.5)) found = id;
     }
-    if (found === here) return;
+    if (found === here && !force) return;
     here = found;
     ui.prompt.hidden = !found;
     if (!found) return;
@@ -291,6 +428,8 @@ export async function startIsland({ root, places }: IslandOptions) {
     ui.promptGo.textContent = p.action;
     ui.promptGo.href = p.href ?? '#';
   }
+  // the screen is drawn when the bull comes within 40 m of the pavilion
+  const nearPavilion = () => Math.hypot(me.x - SITES.warrenia.x, me.z - SITES.warrenia.z) < 40;
 
   // ---------------------------------------------------------------- quality from measured fps
   let frames = 0, fpsT = performance.now(), fps = 0, slowWindows = 0;
@@ -313,13 +452,21 @@ export async function startIsland({ root, places }: IslandOptions) {
     const dt = Math.min(0.05, (nowMs - last) / 1000);
     last = nowMs;
     const now = (shared.time.value += dt);
-    if (mode === 'follow') moveBull(dt, now); else { input.poll(); if (input.active()) setView('follow'); bull.update(dt, now, 0, 0, null, () => undefined); }
-    updateLight(dt);
+    const v = visit.update(dt, now), pv = pav.update(dt);
+    if (!v.drawIsland || !pv.drawIsland) { requestAnimationFrame(frame); countFrame(nowMs); return; }
+    if (!idle()) bull.update(dt, now, 0, 0, null, groundAt, () => undefined);
+    else if (mode === 'follow') moveBull(dt, now); else { input.poll(); if (input.active()) setView('follow'); bull.update(dt, now, 0, 0, null, groundAt, () => undefined); }
+    if (!screenDrawn && nearPavilion()) drawScreen();
+    if (!skyPreloaded && night > 0.3) { skyPreloaded = true; loadStars().then(() => loadSky()).catch(() => undefined); }
+    updateLight(dt, v.night);
+    renderer.toneMappingExposure *= 1 - 0.97 * v.dark;
+    world.setFade(v.hide);
     world.update(dt, now, night);
     prints.wash(world.seaLevel);
     dust.step(dt, now, night);
     birds.update(dt, now, shared.bull.value, night);
-    moveCamera(dt, now);
+    if (idle()) moveCamera(dt, now);
+    shared.cam.value.copy(camera.position);
     updatePlace();
     audio.update({
       night, swash: world.seaLevel / 0.14,
@@ -328,7 +475,10 @@ export async function startIsland({ root, places }: IslandOptions) {
       trees: 0.5,
     });
     renderer.render(scene, camera);
-
+    countFrame(nowMs);
+    requestAnimationFrame(frame);
+  }
+  function countFrame(nowMs: number) {
     frames++;
     if (nowMs - fpsT > 2000) {
       fps = Math.round((frames * 1000) / (nowMs - fpsT));
@@ -340,7 +490,14 @@ export async function startIsland({ root, places }: IslandOptions) {
       }
       if (!ui.debug.hidden) ui.debug.textContent = `${fps} fps · calidad ${tier} · ${renderer.info.render.calls} llamadas · noche ${night.toFixed(2)}`;
     }
-    requestAnimationFrame(frame);
+  }
+
+  function placeBull(x: number, z: number, heading: number) {
+    Object.assign(me, { x, z, heading, speed: 0, turnRate: 0 });
+    autopilot = [];
+    bull.group.position.set(x, groundAt(x, z), z); bull.group.rotation.set(0, heading, 0); bull.reset(groundAt);
+    cameraTarget(shared.time.value); camPos.copy(want); camLook.copy(look);
+    camera.position.copy(camPos); camera.lookAt(camLook);
   }
 
   ui.debug.hidden = !params.has('debug');
@@ -355,16 +512,29 @@ export async function startIsland({ root, places }: IslandOptions) {
     get night() { return night; },
     get here() { return here; },
     get mode() { return mode; },
-    get bull() { return { x: me.x, z: me.z, heading: me.heading, speed: me.speed, gait: { ...bull.weights } }; },
+    get bull() { return { x: me.x, z: me.z, heading: me.heading, speed: me.speed, gait: { ...bull.weights }, stride: { name: bull.gait.name, f: bull.gait.f, D: bull.gait.D } }; },
     get prints() { return prints.count(); },
     get scared() { return birds.scared; },
     get flocks() { return birds.perched(); },
     get stars() { return stars?.count ?? 0; },
     get autopilot() { return autopilot.length; },
     get sound() { return audio.on; },
-    place(x: number, z: number, heading: number) { Object.assign(me, { x, z, heading, speed: 0 }); cameraTarget(shared.time.value); camPos.copy(want); camLook.copy(look); },
+    place: placeBull,
+    get visit() { return visit.state; },
+    get visitT() { return visit.progress; },
+    goUp: (slug?: string) => goUp(slug),
+    goDown,
+    get pavilion() { return pav.state; },
+    get demoTab() { return pav.demo?.tab ?? null; },
+    enterWarrenia: (tab?: Tab) => enterPavilion(tab),
+    leaveWarrenia: leavePavilion,
     goTo,
     renderer, camera, scene, shared, bullAnim: bull, props: world.props,
   };
   requestAnimationFrame(frame);
+  // a link straight to a place: #observatorio[/<note>], #warrenia[/<tab>] or #sobre-mi
+  const startIn = route();
+  if (startIn?.to === 'sky') goUp(startIn.slug, true);
+  else if (startIn?.to === 'warrenia') enterPavilion(startIn.tab, true);
+  else if (startIn?.to === 'about') openAbout();
 }

@@ -1,7 +1,6 @@
-import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { createPrints } from '../src/island/effects';
-import { GAITS, WALK_PHASE, deriveClip } from '../src/island/gaits';
+import { GAITS, gaitAt } from '../src/island/locomotion';
 import { createLightUniforms, nightAt } from '../src/island/palette';
 import { createShared } from '../src/island/shaders';
 import {
@@ -74,41 +73,32 @@ describe('routes from the map', () => {
   }
 });
 
-describe('gaits derived from the walk', () => {
-  // a fake walk: one leg bone turning back and forth, and a spine bone
-  const T = 2;
-  const times = Array.from({ length: 21 }, (_, i) => (i / 20) * T);
-  const swing = (t: number) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.4 * Math.sin((t / T) * Math.PI * 2)).toArray();
-  const walk = new THREE.AnimationClip('walk', T, [
-    new THREE.QuaternionKeyframeTrack('front_l_standardpaw_jnt_017.quaternion', times, times.flatMap(swing)),
-    new THREE.VectorKeyframeTrack('qspine_m_spine0ik_jnt_08.position', [0, T], [0, 0, 0, 0, 1, 0]),
-  ]);
-  const angleAt = (clip: THREE.AnimationClip, t: number) => {
-    const tr = clip.tracks[0] as THREE.KeyframeTrack & { createInterpolant(): THREE.Interpolant };
-    const q = new THREE.Quaternion().fromArray(tr.createInterpolant().evaluate(t) as unknown as number[]);
-    return 2 * Math.atan2(q.x, q.w);
-  };
-
-  it('keep the length and the body tracks of the walk', () => {
-    const trot = deriveClip(walk, 'trot', GAITS.trot);
-    expect(trot.duration).toBe(T);
-    expect(trot.tracks).toHaveLength(2);
-    expect(Array.from(trot.tracks[1].values)).toEqual(Array.from(walk.tracks[1].values));
+describe('the gait table', () => {
+  it('goes from walk to trot, canter and gallop as speed rises', () => {
+    expect([0.5, 2.5, 4.5, 8].map((v) => gaitAt(v).name)).toEqual(['walk', 'trot', 'canter', 'gallop']);
   });
 
-  it('move each leg to its new moment in the cycle', () => {
-    const shift = (((GAITS.trot.phase.front_l - WALK_PHASE.front_l) % 1) + 1) % 1;
-    const trot = deriveClip(walk, 'trot', { ...GAITS.trot, amp: 1 }, 96);
-    for (const t of [0.3, 0.9, 1.4]) {
-      const before = ((t - shift * T) % T + T) % T;
-      expect(angleAt(trot, t)).toBeCloseTo(angleAt(walk, before), 2);
-    }
+  it('gallops faster with longer strides, not quicker steps', () => {
+    // stride length = speed / frequency: from 7 to 11 m/s the stride grows ~45 %, the rate ~10 %
+    const a = gaitAt(7), b = gaitAt(11);
+    expect(b.f / a.f).toBeLessThan(1.12);
+    expect(11 / b.f / (7 / a.f)).toBeGreaterThan(1.4);
+    for (const v of [7, 9, 11]) expect(gaitAt(v).f).toBeGreaterThan(1.9), expect(gaitAt(v).f).toBeLessThan(2.25);
   });
 
-  it('lengthen the stride by scaling the swing', () => {
-    const gallop = deriveClip(walk, 'gallop', { phase: WALK_PHASE, amp: 1.5 }, 96);
-    const peak = (clip: THREE.AnimationClip) => Math.max(...times.map((t) => Math.abs(angleAt(clip, t))));
-    expect(peak(gallop) / peak(walk)).toBeCloseTo(1.5, 1);
+  it('keeps the footfalls in order: lateral walk, diagonal trot, hind-then-fore gallop', () => {
+    const walk = GAITS[1].off, trot = GAITS[3].off, gallop = GAITS[7].off;
+    // walk: hind left, fore left, hind right, fore right, a quarter apart
+    expect([walk[2], walk[0], walk[3], walk[1]]).toEqual([0, 0.25, 0.5, 0.75]);
+    // trot: front left with hind right, front right with hind left
+    expect(Math.abs(trot[0] - trot[3])).toBeLessThan(0.05);
+    expect(Math.abs(trot[1] - trot[2])).toBeLessThan(0.05);
+    // gallop: both hinds land before both fores
+    expect(Math.max(gallop[2], gallop[3])).toBeLessThan(Math.min(gallop[0], gallop[1]));
+  });
+
+  it('blends offsets the short way round between rows', () => {
+    for (let v = 0; v <= 11; v += 0.25) for (const o of gaitAt(v).off) { expect(o).toBeGreaterThanOrEqual(0); expect(o).toBeLessThan(1); }
   });
 });
 

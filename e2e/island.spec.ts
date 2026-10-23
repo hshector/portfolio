@@ -136,7 +136,8 @@ test('a link to #warrenia/<tab> opens that tab in the pavilion', async ({ page }
   await expect(page).toHaveURL(/\/\?lite$/);
 });
 
-test('from the observatory the visitor rises into the constellation, and comes back down', async ({ page }, info) => {
+test('from the observatory the visitor rises into the constellation, and comes back down', async ({ page, request }, info) => {
+  const meta = await (await request.get('/data/graph.json')).json();
   const errors = await open(page);
   await isla(page, (i) => i.place(0, -30, Math.PI));
   await expect(page.locator('[data-prompt-title]')).toHaveText('Observatorio · La biblioteca');
@@ -144,6 +145,10 @@ test('from the observatory the visitor rises into the constellation, and comes b
   await expect(page).toHaveURL(/#observatorio$/);
   await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('sky');
   await expect(page.locator('[data-constellation]')).toBeVisible();
+  // the whole network is lit on arrival, with nothing chosen and no names on the sky
+  type Sky = { __constellation: { visibleStars(): number; labels(): unknown[] } };
+  await expect.poll(() => page.evaluate(() => (window as unknown as Sky).__constellation.visibleStars())).toBe(meta.nodes);
+  expect(await page.evaluate(() => (window as unknown as Sky).__constellation.labels().length)).toBe(0);
   await page.locator('[data-constellation]').getByRole('button', { name: /Volver al toro/ }).click();
   await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('island');
   await expect(page).toHaveURL(/\/\?lite$/);

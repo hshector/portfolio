@@ -1,6 +1,6 @@
-// The nebula: a 3D sky of every published note, with a panel beside it (src/components/ConstellationUI.astro).
-// Owns the state (focus, hidden themes, tours and routes), the camera flights, the labels for each
-// zoom level, picking, and what the panel shows: the library (themes, books, routes) or a star's card.
+// The network: a 3D sky of every published note, with a panel beside it (src/components/ConstellationUI.astro).
+// Owns the state (focus, tours and routes), the camera flights, the labels of the chosen star,
+// picking, and what the panel shows: the library (themes, books, routes) or a star's card.
 
 import * as THREE from 'three';
 import { THEMES } from '../lib/themes';
@@ -13,7 +13,7 @@ import { starColor } from './style';
 // The interface is bound when the sky is mounted: on its own page, or inside the island
 // (mountConstellation), where it shares the island's canvas and renderer.
 let root: HTMLElement, canvas: HTMLCanvasElement, labelLayer: HTMLElement, panel: HTMLElement, home: HTMLElement, sidebar: HTMLElement;
-let searchInput: HTMLInputElement, searchList: HTMLUListElement, legend: HTMLElement, debugBox: HTMLElement;
+let searchInput: HTMLInputElement, searchList: HTMLUListElement, debugBox: HTMLElement;
 function bind(rootEl: HTMLElement, canvasEl: HTMLCanvasElement) {
   const $ = <T extends Element>(sel: string) => rootEl.querySelector<T>(sel)!;
   root = rootEl;
@@ -24,7 +24,6 @@ function bind(rootEl: HTMLElement, canvasEl: HTMLCanvasElement) {
   sidebar = $('#sidebar');
   searchInput = $('#search');
   searchList = $('#search-results');
-  legend = $('#legend');
   debugBox = $('#debug');
 }
 /** Inside the island, the sky only listens while it is showing. */
@@ -138,17 +137,13 @@ export async function mountConstellation(rootEl: HTMLElement, canvasEl: HTMLCanv
 }
 
 type Box = [left: number, top: number, right: number, bottom: number];
-type LabelKind = 'hover' | 'focus' | 'near' | 'nearBook' | 'book' | 'concept' | 'theme';
+type LabelKind = 'focus' | 'near' | 'nearBook';
 
 /** Box height and maximum width of each kind of label; the look is in ConstellationUI.astro. */
 const LABEL_STYLE: Record<LabelKind, { cls: string; h: number; max: number }> = {
-  theme: { cls: 'theme', h: 28, max: 260 },
-  book: { cls: 'book', h: 16, max: 260 },
   nearBook: { cls: 'near book', h: 16, max: 250 },
-  concept: { cls: 'concept', h: 16, max: 230 },
   near: { cls: 'near', h: 16, max: 230 },
   focus: { cls: 'focus', h: 22, max: 300 },
-  hover: { cls: 'hover', h: 26, max: 300 },
 };
 
 interface Tour {
@@ -162,7 +157,6 @@ interface Tour {
 class App {
   private focus = -1;
   private hover = -1;
-  private hidden = new Set<number>();
   private tour: Tour | null = null;
   private pointer = { x: 0, y: 0, inside: false, moved: false, downX: 0, downY: 0, down: false };
   private flight: { t: number; start: number; from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3 } | null = null;
@@ -183,10 +177,8 @@ class App {
   private searchHits: number[] = [];
   private searchActive = -1;
   private degree: Uint32Array;
-  private books: number[];
   /** Number of books each note is linked to (for concepts: in how many books it appears). */
   private bookCount: Uint16Array;
-  private themeBooks: number[];
   /** Where the free part of the screen is, beside the panel (current and target, CSS px). */
   private shift = { x: 0, y: 0, tx: 0, ty: 0 };
   private lastFrame = performance.now();
@@ -204,8 +196,6 @@ class App {
       this.degree[i] = g.adjStart[i + 1] - g.adjStart[i];
       for (const j of neighbours(g, i)) if (g.kinds[j] === 0) this.bookCount[i]++;
     }
-    this.books = [...Array(g.count).keys()].filter((i) => g.kinds[i] === 0);
-    this.themeBooks = themes.map((_, t) => this.books.filter((b) => g.themes[b] === t).length);
   }
 
   /** ownLoop: the stand-alone page draws its own frames; inside the island the island calls frame(). */
@@ -215,7 +205,6 @@ class App {
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.bindPointer();
     this.bindSearch();
-    this.bindLegend();
     this.bindPanel();
     this.bindKeys();
     this.sky.controls.addEventListener('start', () => {
@@ -273,6 +262,7 @@ class App {
     this.touched = false;
     this.flight = null;
     this.intro = 1;
+    this.applyVisibility(); // (every star and line at full strength, whatever the intro had reached)
     this.sky.controls.target.set(0, 0, 0);
     this.sky.camera.position.set(0, 25, 155);
     this.shift.x = this.shift.tx;
@@ -442,7 +432,7 @@ class App {
   /** The ideas the focused star is joined to by a line: a book's ten most shared ideas, or a concept's links. */
   private mainLinks(i: number) {
     const { g } = this;
-    const ns = [...neighbours(g, i)].filter((j) => !this.hidden.has(g.themes[j]));
+    const ns = [...neighbours(g, i)];
     if (g.kinds[i] === 1) return ns.slice(0, 30);
     return ns.filter((j) => g.kinds[j] === 1).sort((a, b) => this.bookCount[b] - this.bookCount[a] || this.degree[b] - this.degree[a]).slice(0, 10);
   }
@@ -455,25 +445,22 @@ class App {
       for (const j of neighbours(g, this.focus)) near.add(j);
     }
     for (let i = 0; i < g.count; i++) {
-      let a = this.hidden.has(g.themes[i]) ? 0 : 1;
-      if (a && this.focus >= 0 && !near.has(i)) a = 0.07;
+      let a = 1;
+      if (this.focus >= 0 && !near.has(i)) a = 0.07;
       if (this.intro < 1) a *= THREE.MathUtils.clamp(this.intro * 2.2 - g.themes[i] * 0.18, 0, 1);
       sky.alpha[i] = a;
     }
     sky.commitAlpha();
     this.applyLinks();
-    // the pulses run out of the chosen star along its links, or over the whole (visible) network
+    // the pulses run out of the chosen star along its links, or over the whole network
     const ends = sky.linkEnds, list: number[] = [];
-    for (let e = 0; e < ends.length / 2; e++) {
-      const a = ends[e * 2], b = ends[e * 2 + 1];
-      if (this.focus >= 0 ? a === this.focus || b === this.focus : this.hidden.size > 0 && !this.hidden.has(g.themes[a]) && !this.hidden.has(g.themes[b]) && g.kinds[a] === 1 && g.kinds[b] === 1) list.push(e);
-    }
+    if (this.focus >= 0) for (let e = 0; e < ends.length / 2; e++) if (ends[e * 2] === this.focus || ends[e * 2 + 1] === this.focus) list.push(e);
     sky.setPulses(list, this.focus);
   }
 
   /**
    * The links, as in Obsidian: all of them at rest; the chosen (or hovered) star's lit up, wider and
-   * brighter, and the rest dimmed. Hidden themes take their links with them.
+   * brighter, and the rest dimmed.
    */
   private linkVis = new Float32Array(0);
   private applyLinks() {
@@ -484,7 +471,7 @@ class App {
     const main = new Set(this.focus >= 0 && g.kinds[this.focus] === 0 ? this.mainLinks(this.focus) : []);
     for (let e = 0; e < m; e++) {
       const a = ends[e * 2], b = ends[e * 2 + 1];
-      let v = this.hidden.has(g.themes[a]) || this.hidden.has(g.themes[b]) ? 0 : Math.min(sky.alpha[a], sky.alpha[b], 1);
+      let v = Math.min(sky.alpha[a], sky.alpha[b], 1);
       if (v > 0 && lit >= 0) {
         if (a === lit || b === lit) v = main.size && !main.has(a === lit ? b : a) ? 1.04 : 2;
         else v = this.focus >= 0 ? 0.1 : 0.4;
@@ -525,7 +512,6 @@ class App {
   private flyToTheme(t: number) {
     const { camera, controls } = this.sky;
     if (this.focus >= 0) this.select(-1);
-    if (this.hidden.has(t)) this.toggleTheme(t);
     this.touched = true;
     const c = this.sky.centroids[t];
     const dir = camera.position.clone().sub(controls.target).normalize();
@@ -622,17 +608,16 @@ class App {
     });
   }
 
-  // ---------------------------------------------------------------- labels (zoom levels)
+  // ---------------------------------------------------------------- labels
 
   /**
-   * Quiet labels, as in Apple's Embedding Atlas: the system face, small, with a dark halo. From afar,
-   * each galaxy's theme as a pill with its number of books, and the biggest books by name; closer,
-   * the books and then the ideas nearest the centre of the view; a chosen star, its name and those
-   * of its main ideas. Labels never overlap each other or the interface, and they fade in and out.
+   * Quiet labels, as in Apple's Embedding Atlas: the system face, small, with a dark halo. The sky
+   * names nothing until a star is chosen (the panel already lists the themes and books);
+   * then its name and those of its main ideas. Labels never overlap each other or the interface,
+   * and they fade in and out.
    */
   private drawLabels() {
     const { g } = this;
-    const dist = this.sky.camera.position.distanceTo(this.sky.controls.target);
     const now = performance.now();
     if (now - this.blockedAt > 500) this.updateBlocked(now);
     const placed: Box[] = [...this.blocked];
@@ -646,8 +631,8 @@ class App {
       const key = `s${i}`;
       if (shown.has(key)) return;
       const x = this.screen[i * 3], y = this.screen[i * 3 + 1];
-      const text = this.shortTitle(i, kind === 'focus' || kind === 'hover');
-      const style = LABEL_STYLE[g.kinds[i] === 0 && kind !== 'focus' && kind !== 'hover' ? (kind === 'near' ? 'nearBook' : 'book') : kind];
+      const text = this.shortTitle(i, kind === 'focus');
+      const style = LABEL_STYLE[g.kinds[i] === 0 && kind === 'near' ? 'nearBook' : kind];
       const w = Math.min(this.textWidth(text, `label ${style.cls}`), style.max);
       const gap = Math.min(this.starRadius(i) * 0.55, 11) + 5;
       const box: Box = [x + gap, y - style.h / 2, x + gap + w, y + style.h / 2];
@@ -657,43 +642,10 @@ class App {
       this.showLabel(key, text, `label ${style.cls}`, box[0], box[1], this.themes[g.themes[i]].color, w);
     };
 
-    if (this.hover >= 0 && this.hover !== this.focus) star(this.hover, 'hover', true);
+    // Names only for the chosen star and its main ideas: the panel already names the themes and books.
     if (this.focus >= 0) {
       star(this.focus, 'focus', true);
       for (const j of this.mainLinks(this.focus)) star(j, 'near');
-    } else {
-      // The galaxies, while their names still fit the view.
-      if (dist > 80) {
-        const v = new THREE.Vector3();
-        this.sky.centroids.forEach((c, t) => {
-          if (this.hidden.has(t)) return;
-          v.copy(c).project(this.sky.camera);
-          if (v.z > 1) return;
-          const style = LABEL_STYLE.theme, theme = this.themes[t];
-          const html = `<i></i>${esc(theme.name)}<b>${this.themeBooks[t]}</b>`;
-          const w = this.textWidth(html, 'label theme', true);
-          const x = (v.x * 0.5 + 0.5) * W, y = (-v.y * 0.5 + 0.5) * H;
-          // Two galaxies can line up from some angles: try just below, then just above.
-          const box = [0, 30, -30].map((dy): Box => [x - w / 2, y + dy - style.h / 2, x + w / 2, y + dy + style.h / 2]).find(fits);
-          if (!box) return;
-          placed.push(box);
-          shown.add(`t${t}`);
-          this.showLabel(`t${t}`, theme.name, 'label theme', box[0], box[1], theme.color, w, html, theme.mark);
-        });
-      }
-      // Books: from afar the biggest ones; closer, the ones nearest the centre of the view.
-      const free = this.freeArea(), fx = (free.left + free.right) / 2, fy = (free.top + free.bottom) / 2;
-      const central = (i: number) => Math.hypot(this.screen[i * 3] - fx, this.screen[i * 3 + 1] - fy) + this.screen[i * 3 + 2] * 2;
-      const visibleBooks = this.books.filter((b) => this.screen[b * 3 + 2] > 0 && this.sky.alpha[b] > 0.5);
-      const far = dist > 110;
-      visibleBooks.sort((a, b) => (far ? this.degree[b] - this.degree[a] : central(a) - central(b)));
-      for (const b of visibleBooks.slice(0, far ? (W < 720 ? 6 : 14) : dist < 60 ? 6 : 10)) star(b, 'book');
-      if (dist < 55) {
-        const cand: number[] = [];
-        for (let i = 0; i < g.count; i++) if (g.kinds[i] === 1 && this.screen[i * 3 + 2] > 0 && this.sky.alpha[i] > 0.5) cand.push(i);
-        cand.sort((a, b) => central(a) - central(b));
-        for (const i of cand.slice(0, 40)) star(i, 'concept');
-      }
     }
 
     // Fade out labels that are no longer shown; drop them once they have faded.
@@ -709,19 +661,16 @@ class App {
     }
   }
 
-  private showLabel(key: string, text: string, cls: string, x: number, y: number, color: string, width: number, html?: string, mark?: string) {
+  private showLabel(key: string, text: string, cls: string, x: number, y: number, color: string, width: number) {
     let el = this.labelEls.get(key);
     if (!el) {
       el = document.createElement('div');
       labelLayer.appendChild(el);
       this.labelEls.set(key, el);
     }
-    if (html !== undefined) {
-      if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
-    } else if (el.textContent !== text) el.textContent = text;
+    if (el.textContent !== text) el.textContent = text;
     const full = `${cls} on`;
     if (el.className !== full) el.className = full;
-    if (mark) el.dataset.mark = mark;
     el.style.setProperty('--c', color);
     el.style.width = `${Math.ceil(width)}px`;
     el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
@@ -731,13 +680,12 @@ class App {
    * Natural width of a label, measured with a hidden element that has the label's own classes,
    * so font loading, letter-spacing and padding are all accounted for. Cached per text.
    */
-  private textWidth(text: string, cls: string, html = false) {
+  private textWidth(text: string, cls: string) {
     const key = `${cls}|${text}`;
     let w = this.widths.get(key);
     if (w === undefined) {
       this.measurer.className = `${cls} measure`;
-      if (html) this.measurer.innerHTML = text;
-      else this.measurer.textContent = text;
+      this.measurer.textContent = text;
       w = this.measurer.getBoundingClientRect().width + 1;
       this.widths.set(key, w);
     }
@@ -748,7 +696,7 @@ class App {
   private updateBlocked(now: number) {
     this.blockedAt = now;
     const c = canvas.getBoundingClientRect();
-    this.blocked = ['#sidebar', '#legend', '.zoom', '.hint', '#debug']
+    this.blocked = ['#sidebar', '.zoom', '.hint', '#debug']
       .flatMap((sel) => [...root.querySelectorAll<HTMLElement>(sel)])
       .filter((el) => !el.hidden && el.offsetParent !== null && getComputedStyle(el).display !== 'none')
       .map((el) => el.getBoundingClientRect())
@@ -945,7 +893,6 @@ class App {
       const j = a.dataset.star ? Number(a.dataset.star) : this.g.indexOf.get(a.dataset.slug ?? href);
       if (j === undefined) return;
       e.preventDefault();
-      if (this.hidden.has(this.g.themes[j])) this.toggleTheme(this.g.themes[j]);
       this.select(j, { keepTour: !!this.tour && this.tour.stops.includes(j) });
     });
     sidebar.addEventListener('pointerover', (e) => {
@@ -1029,23 +976,6 @@ class App {
       if (!li) return;
       e.preventDefault();
       choose(Number(li.dataset.star));
-    });
-  }
-
-  private toggleTheme(t: number) {
-    if (this.hidden.has(t)) this.hidden.delete(t);
-    else this.hidden.add(t);
-    legend.querySelector(`[data-theme="${this.g.themeNames[t]}"]`)?.setAttribute('aria-pressed', String(!this.hidden.has(t)));
-    if (this.focus >= 0 && this.hidden.has(this.g.themes[this.focus])) this.select(-1);
-    else this.applyVisibility();
-  }
-
-  private bindLegend() {
-    legend.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-theme]');
-      if (!btn) return;
-      const t = this.g.themeNames.indexOf(btn.dataset.theme!);
-      if (t >= 0) this.toggleTheme(t);
     });
   }
 

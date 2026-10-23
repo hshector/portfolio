@@ -27,7 +27,8 @@ test('every note becomes a star', async ({ page, request }) => {
   const meta = await (await request.get('/data/graph.json')).json();
   await ready(page, '/constelacion');
   await expect.poll(() => page.evaluate(() => (window as unknown as { __constellation: Api }).__constellation.visibleStars()), { timeout: 15_000 }).toBe(meta.nodes);
-  await expect(page.locator('#legend button')).toHaveCount(6);
+  // the panel lists the themes: there is no second legend over the sky
+  await expect(page.locator('#legend')).toHaveCount(0);
 });
 
 test('search flies to a note and opens it in the panel', async ({ page }) => {
@@ -63,17 +64,6 @@ test('a book can be toured concept by concept', async ({ page }) => {
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#panel .tour span')).toContainText('2 de 10');
   expect(await focusOf(page)).not.toBe(first);
-});
-
-test('themes can be hidden from the legend', async ({ page }) => {
-  await ready(page, '/constelacion');
-  const count = () => page.evaluate(() => (window as unknown as { __constellation: Api }).__constellation.visibleStars());
-  await expect.poll(count, { timeout: 15_000 }).toBeGreaterThan(3000);
-  const before = await count();
-  const finanzas = page.locator('#legend button[data-theme="Finanzas"]');
-  await finanzas.click();
-  await expect(finanzas).toHaveAttribute('aria-pressed', 'false');
-  expect(await count()).toBeLessThan(before - 500);
 });
 
 test('clicking a star on the canvas selects it', async ({ page }) => {
@@ -137,7 +127,7 @@ const overlaps = (a: Label['rect'], b: Label['rect']) => a.left < b.right && a.r
 const checkLabels = async (page: Page) => {
   const labels = await api(page, (c) => c.labels());
   const ui = await page.evaluate(() =>
-    ['#sidebar', '#legend', '.zoom']
+    ['#sidebar', '.zoom']
       .flatMap((s) => [...document.querySelectorAll<HTMLElement>(s)])
       .filter((e) => !e.hidden && e.offsetParent)
       .map((e) => e.getBoundingClientRect().toJSON()),
@@ -149,23 +139,26 @@ const checkLabels = async (page: Page) => {
   return labels;
 };
 
-test('labels change with the zoom level and never cover each other or the interface', async ({ page }) => {
+test('the sky names nothing until a star is chosen, and its labels never cover each other or the interface', async ({ page }) => {
   await ready(page, '/constelacion');
   await page.waitForTimeout(2200);
-  const far = await checkLabels(page);
-  expect(far.length).toBeGreaterThanOrEqual(4);
-  expect(far.filter((l) => l.kind === 'theme').length).toBeGreaterThanOrEqual(4);
+  expect(await checkLabels(page)).toEqual([]);
 
+  // closer in, still no names
   await api(page, (c) => c.zoom(100));
-  await expect.poll(async () => (await api(page, (c) => c.labels())).some((l) => l.kind === 'book'), { timeout: 15_000 }).toBe(true);
-  await checkLabels(page);
+  await page.waitForTimeout(1500);
+  expect(await checkLabels(page)).toEqual([]);
 
   await api(page, (c) => c.select('patron-oro'));
   await expect(page.locator('#panel h2')).toHaveText('Patrón oro');
-  await page.waitForTimeout(1500);
+  // (once the camera has flown to it)
+  await expect.poll(async () => (await api(page, (c) => c.labels())).some((l) => l.kind === 'focus' && l.text === 'Patrón oro'), { timeout: 15_000 }).toBe(true);
   const near = await checkLabels(page);
-  expect(near.some((l) => l.kind === 'focus' && l.text === 'Patrón oro')).toBe(true);
-  expect(near.some((l) => l.kind === 'theme')).toBe(false);
+  expect(near.some((l) => l.kind === 'near')).toBe(true);
+
+  // and none again once it is let go
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await api(page, (c) => c.labels())).length).toBe(0);
 });
 
 test('the whole sky fits the first view, also on a phone', async ({ page, request }) => {

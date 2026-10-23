@@ -19,7 +19,7 @@ Elegido por Héctor entre dos propuestas («Cristal» y «Panel»): **Panel, que
   común, ideas con fecha); «Recorrer el libro» (sus 10 ideas más compartidas, con ← →); ideas principales;
   libros conectados con cuántas ideas comparten; el resumen y la lista completa.
 - **Plegado («Cristal»):** el panel queda en su barra de arriba (marca y buscador) y el cielo ocupa toda la
-  pantalla, con los filtros de temas y el zoom flotando en paneles de cristal.
+  pantalla, con el zoom flotando en un panel de cristal.
 - **De nebulosa a red (oct 2026):** Héctor vio que el gas lo emborronaba todo y no dejaba ver qué se une con
   qué. Se quitó el gas y volvieron las líneas, ahora todas, con color y luz. El panel no cambió.
 - **La vista sigue al panel:** el centro de la cámara se desplaza (`setViewOffset`) para que el cielo quede en
@@ -48,10 +48,11 @@ Elegido por Héctor entre dos propuestas («Cristal» y «Panel»): **Panel, que
 - **Bloom** (`UnrealBloomPass`): solo para estrellas y pulsos. Las líneas se dibujan después, nítidas: con miles
   de líneas superpuestas, el bloom quemaba el centro en blanco (comprobado en captura).
 - **Etiquetas**, como en Embedding Atlas de Apple: fuente del sistema, pequeñas, con un halo oscuro.
-  - De lejos: cada temática como una pastilla con su número de libros, y los libros más grandes.
-  - Más cerca: los libros y luego las ideas del centro de la vista.
-  - Al elegir una estrella: su nombre y el de sus ideas principales.
-  - Ninguna pisa a otra ni al panel o los controles.
+  - El cielo no nombra nada hasta que se elige una estrella: los temas y los libros ya están en el panel
+    (petición de Héctor, oct 2026; antes había pastillas de temas, títulos de libros y una leyenda abajo).
+  - Al elegir una estrella: su nombre y el de sus ideas principales. Ninguna pisa a otra ni al panel o el zoom.
+- **Al llegar desde la isla** se ve ya la red entera. Antes, `resetView()` daba la animación de entrada por
+  acabada sin aplicarla y la red quedaba invisible hasta tocar algo; el E2E de la isla lo comprueba ahora.
 - **Tipografía:** la fuente del sistema (en Apple, SF Pro; su licencia no permite servirla en una web) e Inter
   (SIL OFL 1.1) en el resto.
 

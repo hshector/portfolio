@@ -22,6 +22,7 @@
     "@astrojs/sitemap": "3.7.4",
     "@fontsource-variable/bricolage-grotesque": "5.2.10",
     "@fontsource-variable/hanken-grotesk": "5.2.8",
+    "@fontsource-variable/inter": "5.2.6",
     "@fontsource-variable/jetbrains-mono": "5.2.8",
     "astro": "7.3.8",
     "katex": "0.16.47",

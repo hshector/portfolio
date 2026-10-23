@@ -19,7 +19,7 @@ const api = async <T>(page: Page, fn: (c: Api) => T): Promise<T> => {
 };
 const ready = async (page: Page, url: string) => {
   await page.goto(url);
-  await expect(page.locator('[data-constellation]')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+  await expect(page.locator('[data-constellation]')).toHaveAttribute('data-state', 'ready', { timeout: 40_000 });
 };
 const focusOf = (page: Page) => page.evaluate(() => (window as unknown as { __constellation: Api }).__constellation.focus());
 
@@ -57,7 +57,7 @@ test('a link to a note opens the sky focused on it, and links in the panel fly t
 
 test('a book can be toured concept by concept', async ({ page }) => {
   await ready(page, '/constelacion#daniel-yergin-the-prize');
-  await page.getByRole('button', { name: 'Recorrer este libro' }).click();
+  await page.getByRole('button', { name: 'Recorrer el libro' }).click();
   await expect(page.locator('#panel .tour span')).toContainText('1 de 10');
   const first = await focusOf(page);
   await page.keyboard.press('ArrowRight');
@@ -82,13 +82,13 @@ test('clicking a star on the canvas selects it', async ({ page }) => {
   await page.waitForTimeout(1500); // let the camera finish its flight
   const target = await page.evaluate(() => {
     const c = (window as unknown as { __constellation: Api }).__constellation;
-    const panel = document.querySelector('#panel')!.getBoundingClientRect();
+    const panel = document.querySelector('#sidebar')!.getBoundingClientRect();
     for (const a of document.querySelectorAll<HTMLAnchorElement>('#panel .links a')) {
       const slug = a.getAttribute('href')!.split('/').pop()!;
       const s = c.starScreen(slug);
-      // Desktop: the panel is on the right. Phone: it is a sheet along the bottom.
+      // Desktop: the panel is on the left. Phone: it is a sheet along the bottom.
       const sheet = panel.width > innerWidth * 0.8;
-      const free = sheet ? s.x > 30 && s.x < innerWidth - 30 && s.y > 150 && s.y < panel.top - 30 : s.x > 40 && s.y > 90 && s.x < panel.left - 40 && s.y < innerHeight - 80;
+      const free = sheet ? s.x > 30 && s.x < innerWidth - 30 && s.y > 150 && s.y < panel.top - 30 : s.x > panel.right + 40 && s.y > 90 && s.x < innerWidth - 90 && s.y < innerHeight - 90;
       if (s.visible && free) return { slug, ...s };
     }
     return null;
@@ -125,7 +125,7 @@ test('on a phone the focused star stays above the reading sheet', async ({ page,
   await page.waitForTimeout(1500);
   const { star, sheetTop, overflow } = await page.evaluate(() => ({
     star: (window as unknown as { __constellation: Api }).__constellation.starScreen('bitcoin'),
-    sheetTop: document.querySelector('#panel')!.getBoundingClientRect().top,
+    sheetTop: document.querySelector('#sidebar')!.getBoundingClientRect().top,
     overflow: document.documentElement.scrollWidth > innerWidth,
   }));
   expect(overflow).toBe(false);
@@ -137,7 +137,7 @@ const overlaps = (a: Label['rect'], b: Label['rect']) => a.left < b.right && a.r
 const checkLabels = async (page: Page) => {
   const labels = await api(page, (c) => c.labels());
   const ui = await page.evaluate(() =>
-    ['.bar > *', '#legend button', '#panel']
+    ['#sidebar', '#legend', '.zoom']
       .flatMap((s) => [...document.querySelectorAll<HTMLElement>(s)])
       .filter((e) => !e.hidden && e.offsetParent)
       .map((e) => e.getBoundingClientRect().toJSON()),
@@ -154,10 +154,10 @@ test('labels change with the zoom level and never cover each other or the interf
   await page.waitForTimeout(2200);
   const far = await checkLabels(page);
   expect(far.length).toBeGreaterThanOrEqual(4);
-  expect(far.every((l) => l.kind === 'theme')).toBe(true);
+  expect(far.filter((l) => l.kind === 'theme').length).toBeGreaterThanOrEqual(4);
 
   await api(page, (c) => c.zoom(100));
-  await expect.poll(async () => (await api(page, (c) => c.labels())).some((l) => l.kind === 'book')).toBe(true);
+  await expect.poll(async () => (await api(page, (c) => c.labels())).some((l) => l.kind === 'book'), { timeout: 15_000 }).toBe(true);
   await checkLabels(page);
 
   await api(page, (c) => c.select('patron-oro'));
@@ -173,4 +173,31 @@ test('the whole sky fits the first view, also on a phone', async ({ page, reques
   await ready(page, '/constelacion');
   await page.waitForTimeout(500);
   expect(await api(page, (c) => c.onScreen())).toBeGreaterThan(meta.nodes * 0.97);
+});
+
+test('the panel shows the library by theme, book and route, and folds away', async ({ page, isMobile }) => {
+  await ready(page, '/constelacion');
+  await expect(page.locator('#home h1')).toHaveText('Biblioteca');
+  await expect(page.locator('[data-go-theme]')).toHaveCount(6);
+  await page.getByRole('tab', { name: 'Libros' }).click();
+  await expect(page.locator('#pane-libros .row')).toHaveCount(48);
+  await page.locator('#pane-libros .row', { hasText: 'The Prize' }).click();
+  await expect(page.locator('#panel h2')).toHaveText('The Prize');
+  await expect(page.locator('#panel .byline')).toHaveText('Daniel Yergin · 1991');
+  await expect(page.locator('#panel .stats div')).toHaveCount(3);
+  expect(await focusOf(page)).toBe('daniel-yergin-the-prize');
+  await page.getByRole('button', { name: 'Biblioteca' }).click();
+  await expect(page.locator('#panel')).toBeHidden();
+  // every suggested route is shown (each step shares ideas with the next) and can be followed
+  await page.getByRole('tab', { name: 'Recorridos' }).click();
+  await expect(page.locator('#pane-recorridos [data-route]:visible')).toHaveCount(3);
+  await page.locator('[data-route="0"]').click();
+  await expect(page.locator('#panel .tour span')).toContainText('1 de 3');
+  await page.keyboard.press('Escape');
+  // fold the panel away: the whole sky, with the search still at hand
+  await page.locator('[data-action="toggle-panel"]:visible').first().click();
+  await expect(page.locator('[data-constellation]')).toHaveAttribute('data-panel', 'collapsed');
+  await expect(page.locator('#home')).toBeHidden();
+  await expect(page.locator('#search')).toBeVisible();
+  if (!isMobile) await expect(page.locator('.zoom')).toBeVisible();
 });

@@ -16,6 +16,8 @@ export interface GraphData {
   adjStart: Uint32Array;
   adj: Uint32Array;
   indexOf: Map<string, number>;
+  /** Author and year of each book, by node. */
+  bookInfo: Map<number, { author: string; year: number | null }>;
 }
 
 interface GraphMeta {
@@ -25,6 +27,7 @@ interface GraphMeta {
   edgeIndex: 'uint16' | 'uint32';
   themes: string[];
   list: [string, string, 0 | 1, number][];
+  books?: [number, string, number | null][];
 }
 
 export const WORLD_RADIUS = 60;
@@ -70,6 +73,7 @@ export async function loadGraph(base = '/data'): Promise<GraphData> {
     adjStart,
     adj,
     indexOf: new Map(meta.list.map((l, i) => [l[0], i])),
+    bookInfo: new Map((meta.books ?? []).map(([i, author, year]) => [i, { author, year }])),
   };
 }
 

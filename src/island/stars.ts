@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { loadGraph } from '../constellation/data';
+import { STAR_SHAPE, starColor, starSize } from '../constellation/style';
 import { THEMES } from '../lib/themes';
 import type { Shared } from './shaders';
 
@@ -30,11 +31,11 @@ export async function createLibrarySky(shared: Shared, night: { value: number })
     col.set([c.r, c.g, c.b], i * 3);
     size[i] = g.kinds[i] === 0 ? 7 : 3.2; // books shine brighter than concepts
     ph[i] = (i * 0.6180339) % 1;
-    // as in the constellation (src/constellation/scene.ts)
-    const deg = g.adjStart[i + 1] - g.adjStart[i], book = g.kinds[i] === 0;
-    skySize[i] = book ? 9 + Math.min(Math.sqrt(deg), 24) * 0.55 : 2.9 + Math.min(Math.sqrt(deg), 10) * 0.6;
-    const k = book ? 1.15 : 1;
-    skyCol.set([tc.r * k, tc.g * k, tc.b * k], i * 3);
+    // as in the nebula (src/constellation/style.ts); the nebula's output pass turns its colours
+    // into sRGB, the island draws them as they are, so they are converted here
+    skySize[i] = starSize(g, i);
+    starColor(g, i, theme >= 0 ? THEMES[theme].color : '#ffffff', c).convertLinearToSRGB();
+    skyCol.set([c.r, c.g, c.b], i * 3);
     ring[i] = THEMES[theme]?.mark === 'ring' ? 1 : 0;
   }
   const geo = new THREE.BufferGeometry();
@@ -65,21 +66,20 @@ export async function createLibrarySky(shared: Shared, night: { value: number })
         vA = mix(smoothstep(0.15, 0.85, uNight) * twinkle, 1.0, m);
         vColor = mix(color, skyColor, m);
         // on the dome: a fixed size; in the constellation: the sky's own size and perspective
-        float skyPx = min(skySize * uSkyScale * (100.0 * uMorphScale / -mv.z), 72.0 * uSkyScale);
+        float skyPx = min(skySize * uSkyScale * (100.0 * uMorphScale / -mv.z), 80.0 * uSkyScale);
         gl_PointSize = mix(size * uScale, skyPx, m);
         gl_Position = projectionMatrix * mv;
       }`,
-    // the dome's soft dot becomes the constellation's star (same shape as src/constellation/scene.ts)
+    // the dome's soft dot becomes the nebula's star (same shape: src/constellation/style.ts)
     fragmentShader: /* glsl */ `
       varying vec3 vColor; varying float vA; varying float vM; varying float vRing;
+      ${STAR_SHAPE}
       void main() {
         float d = length(gl_PointCoord - 0.5);
         if (d > 0.5 || vA < 0.01) discard;
-        float core = smoothstep(0.2, 0.0, d), halo = smoothstep(0.5, 0.06, d) * 0.5;
-        float ringShape = smoothstep(0.08, 0.0, abs(d - 0.3)) * 1.4;
         vec3 dome = vColor * (0.7 + 1.2 * smoothstep(0.22, 0.0, d));
-        vec3 sky = vColor * mix(core * 1.6 + halo, ringShape, vRing);
-        gl_FragColor = vec4(mix(dome, sky, vM), mix(smoothstep(0.5, 0.05, d), max(core, halo), vM) * vA);
+        float s = starShape(d, vRing);
+        gl_FragColor = vec4(mix(dome, vColor * s, vM), mix(smoothstep(0.5, 0.05, d), min(1.0, s), vM) * vA);
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
   });

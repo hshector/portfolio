@@ -144,7 +144,7 @@ test('from the observatory the visitor rises into the constellation, and comes b
   await expect(page).toHaveURL(/#observatorio$/);
   await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('sky');
   await expect(page.locator('[data-constellation]')).toBeVisible();
-  await page.getByRole('button', { name: '← Volver al toro' }).click();
+  await page.locator('[data-constellation]').getByRole('button', { name: /Volver al toro/ }).click();
   await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('island');
   await expect(page).toHaveURL(/\/\?lite$/);
   info.annotations.push({ type: 'visit', description: 'up and down' });

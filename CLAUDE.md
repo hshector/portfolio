@@ -37,10 +37,14 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 - `scripts/check-dist.ts`: enlaces internos, que ningún libro publique sus notas privadas y límites de Cloudflare.
 - URLs: `/biblioteca/<slug>` para libros y conceptos, `/biblioteca/tema/<id>` para temáticas.
 
-## Constelación (fase F2)
+## La nebulosa (antes «constelación», fase F2)
 
-- `/constelacion` (`src/pages/constelacion.astro` + `src/constellation/`): three.js `WebGLRenderer` (no
-  WebGPU: ver `docs/CONSTELLATION.md`, con las mediciones). `/constelacion#<slug>` enfoca una nota.
+- La nebulosa: `src/constellation/` + `src/components/ConstellationUI.astro`, dentro de la isla (observatorio) y en
+  `/constelacion`. Diseño elegido por Héctor: panel al estilo Apple Maps (Temas/Libros/Recorridos y ficha) que se
+  pliega para ver el cielo entero; fuente del sistema e Inter, cristal, gas de color con bloom. Detalle en
+  `docs/CONSTELLATION.md`. three.js `WebGLRenderer` (no WebGPU, medido). `/constelacion#<slug>` enfoca una nota.
+- `style.ts` es el aspecto de las estrellas compartido con el cielo de la isla: si cambia, el paso del
+  observatorio sigue siendo continuo. Los recorridos sugeridos están en `routes.ts`.
 - `?debug` muestra fps y calidad. `window.__constellation` es la API que usan los tests E2E.
 
 ## La isla (fase F3)

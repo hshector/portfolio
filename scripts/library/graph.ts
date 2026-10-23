@@ -5,7 +5,8 @@
 // graph.bin layout (little-endian):
 //   Int16 x, y, z per node (positions scaled to ±32767), then
 //   Uint16 a, b per edge (node indexes; Uint32 if there are 65,536 nodes or more).
-// graph.json holds the node list (slug, title, kind, theme index) in the same order.
+// graph.json holds the node list (slug, title, kind, theme index) in the same order, and each
+// book's author and year (for the book cards).
 
 import createGraph from 'ngraph.graph';
 import createLayout from 'ngraph.forcelayout';
@@ -19,6 +20,7 @@ export interface GraphFiles {
     edgeIndex: 'uint16' | 'uint32';
     themes: string[];
     list: [slug: string, title: string, kind: 0 | 1, theme: number][];
+    books: [node: number, author: string, year: number | null][];
   };
   bin: Uint8Array;
 }
@@ -96,6 +98,11 @@ export function buildGraph(lib: Library, iterations = 900): GraphFiles {
       edgeIndex: wide ? 'uint32' : 'uint16',
       themes: lib.themes,
       list: lib.notes.map((n) => [n.slug, n.title, n.kind === 'book' ? 0 : 1, lib.themes.indexOf(n.theme)]),
+      books: lib.notes.flatMap((n, i): [number, string, number | null][] => {
+        if (n.kind !== 'book') return [];
+        const fm = n.frontmatter, year = Number(fm['año']);
+        return [[i, String(fm.autor ?? n.title.split(' - ')[0]), Number.isFinite(year) && year > 0 ? year : null]];
+      }),
     },
     bin,
   };

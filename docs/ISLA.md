@@ -74,6 +74,9 @@ La demo de WarrenIA está en `src/warrenia-demo/` (ver más abajo) y el cielo in
   apaga, y las estrellas de la biblioteca dejan la bóveda y vuelan a su sitio en la constelación 3D.
   El paso al cielo interactivo no se nota porque cada estrella llega a la dirección y al tamaño
   exactos en que la ve la cámara de la constelación (`stars.ts`, `setMorphTarget`).
+  Al llegar, el gas, las líneas y el bloom de la nebulosa se encienden en 1,2 s, y el panel entra después
+  (el cielo empieza a pantalla completa para que el paso no salte) mientras la vista se aparta para dejarle
+  sitio.
 - **El pabellón de WarrenIA** (`pavilion.ts`): en su pared del fondo hay una pantalla de 5,4 × 3,2 m
   con la portada de la app dibujada desde los datos de la demo (`src/warrenia-demo/screen.ts`). La
   cámara se para delante, a la distancia en que la pantalla llena la vista, y la demo real se abre

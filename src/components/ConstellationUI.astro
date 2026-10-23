@@ -1,170 +1,346 @@
 ---
-// The constellation's interface: search, legend, reading panel and star labels. Used twice:
+// The nebula's interface, in the manner of Apple Maps: a panel beside the sky (a sheet from the bottom
+// on a phone) with the library's themes, books and suggested routes, and the card of the chosen star.
+// The panel folds away to leave the whole sky with floating controls. Used twice:
 // - variant "page": the stand-alone /constelacion page (the fallback outside the island), with its own canvas;
 // - variant "island": laid over the island's canvas when the bull reaches the observatory and the
 //   camera looks up (src/island/app.ts), with a button back to the bull.
+// Type: the system face (SF on Apple devices), Inter (SIL OFL 1.1) elsewhere.
+import '@fontsource-variable/inter/index.css';
 import { author } from '../data/site';
 import { num } from '../lib/format';
-import { library } from '../lib/library';
+import { byTitle, library } from '../lib/library';
 import { THEMES } from '../lib/themes';
+import { ROUTES } from '../constellation/routes';
 
 interface Props { variant: 'page' | 'island' }
 const { variant } = Astro.props;
-const { report, themes } = library();
+const { report, themes, notes, bySlug } = library();
 const shown = THEMES.filter((t) => themes.includes(t.name));
 const stars = report.books + report.concepts;
+const books = notes.filter((n) => n.kind === 'book').sort(byTitle);
+const perTheme = (name: string) => ({
+  books: notes.filter((n) => n.theme === name && n.kind === 'book').length,
+  ideas: notes.filter((n) => n.theme === name && n.kind === 'concept').length,
+});
+const bookTitle = (slug: string) => bySlug.get(slug)?.book?.title ?? bySlug.get(slug)?.title.split(' - ').slice(1).join(' - ') ?? slug;
+const shortBook = (slug: string) => { const t = bookTitle(slug).replace(/\s*\(.*\)$/, '').split(/[.:]/)[0]; return t; };
 const Root = variant === 'page' ? 'main' : 'div';
+const icon = {
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  side: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3.5"/><path d="M9.5 4.5v15"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
+  route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>',
+};
 ---
-<Root class:list={['sky', variant]} data-constellation data-state={variant === 'page' ? 'loading' : 'idle'} hidden={variant === 'island'}>
-  {variant === 'page' && <canvas id="sky" aria-label={`Constelación de ${num(stars)} notas. Usa el buscador o la vista en lista para navegar con el teclado.`}></canvas>}
+<Root class:list={['sky', variant]} data-constellation data-state={variant === 'page' ? 'loading' : 'idle'} data-panel="open" hidden={variant === 'island'}>
+  {variant === 'page' && <canvas id="sky" aria-label={`Nebulosa de ${num(stars)} notas. Usa el panel, el buscador o la vista en lista para navegar con el teclado.`}></canvas>}
   <div id="labels" aria-hidden="true"></div>
 
-  <header class="bar">
-    {variant === 'page'
-      ? <a class="brand" href="/">{author.name}</a>
-      : <button class="back" type="button" data-sky-exit>← Volver al toro</button>}
+  <aside id="sidebar" class="sidebar" aria-label="Biblioteca">
+    <button class="grabber" type="button" data-action="toggle-panel" aria-label="Mostrar u ocultar el panel"><span></span></button>
+    <div class="side-top">
+      {variant === 'page'
+        ? <a class="brand" href="/">{author.name}</a>
+        : <button class="back" type="button" data-sky-exit>‹ Volver al toro</button>}
+      <button class="icon-btn" type="button" data-action="toggle-panel" aria-label="Ocultar el panel" title="Ocultar el panel" set:html={icon.side} />
+    </div>
     <div class="search" role="combobox" aria-haspopup="listbox" aria-owns="search-results">
-      <label class="sr" for="search">Buscar una nota</label>
-      <input id="search" type="search" placeholder="Busca un libro o un concepto  ( / )" autocomplete="off" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+      <span class="glyph" aria-hidden="true" set:html={icon.search} />
+      <label class="sr" for="search">Buscar en la biblioteca</label>
+      <input id="search" type="search" placeholder="Buscar libros, ideas o temas" autocomplete="off" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+      <kbd aria-hidden="true">/</kbd>
       <ul id="search-results" role="listbox" aria-label="Resultados" hidden></ul>
     </div>
-    {variant === 'page' && <a class="list" href="/biblioteca">Vista en lista</a>}
-  </header>
 
-  <nav id="legend" class="legend" aria-label="Mostrar u ocultar temáticas">
+    <div id="home" class="body">
+      <div class="title">
+        <h1>Biblioteca</h1>
+        <p>{num(report.books)} libros · {num(report.concepts)} ideas · {shown.length} temas</p>
+      </div>
+      <div class="seg" role="tablist" aria-label="Ver">
+        <button type="button" role="tab" id="tab-temas" aria-controls="pane-temas" aria-selected="true" data-tab="temas">Temas</button>
+        <button type="button" role="tab" id="tab-libros" aria-controls="pane-libros" aria-selected="false" data-tab="libros">Libros</button>
+        <button type="button" role="tab" id="tab-recorridos" aria-controls="pane-recorridos" aria-selected="false" data-tab="recorridos">Recorridos</button>
+      </div>
+      <div id="pane-temas" role="tabpanel" aria-labelledby="tab-temas" class="cards">
+        {shown.map((t) => {
+          const c = perTheme(t.name);
+          return (
+            <button type="button" class="card" data-go-theme={t.name} data-mark={t.mark} style={`--c: ${t.color}`}>
+              <i aria-hidden="true"></i>
+              <span><b>{t.name}</b><small>{c.books} {c.books === 1 ? 'libro' : 'libros'} · {num(c.ideas)} ideas</small></span>
+            </button>
+          );
+        })}
+      </div>
+      <div id="pane-libros" role="tabpanel" aria-labelledby="tab-libros" class="rows" hidden>
+        {books.map((b) => {
+          const t = THEMES.find((x) => x.name === b.theme)!;
+          return (
+            <a class="row" href={`/biblioteca/${b.slug}`} data-slug={b.slug}>
+              <i class="dot" data-mark={t.mark} style={`--c: ${t.color}`} aria-hidden="true"></i>
+              <span><b>{b.book?.title ?? b.title}</b><small>{b.book?.author}{b.book?.year ? ` · ${b.book.year}` : ''}</small></span>
+            </a>
+          );
+        })}
+      </div>
+      <div id="pane-recorridos" role="tabpanel" aria-labelledby="tab-recorridos" class="rows" hidden>
+        <p class="note">Libros que comparten ideas, uno detrás de otro.</p>
+        {ROUTES.map((r, k) => {
+          const t = THEMES.find((x) => x.name === bySlug.get(r.books[0])?.theme) ?? THEMES[0];
+          return (
+            <button type="button" class="row" data-route={k}>
+              <span class="badge" style={`--c: ${t.color}`} aria-hidden="true" set:html={icon.route} />
+              <span><b>{r.title}</b><small>{r.books.map(shortBook).join(' → ')}</small></span>
+              <span class="chev" aria-hidden="true" set:html={icon.chev} />
+            </button>
+          );
+        })}
+      </div>
+      {variant === 'page' && <p class="foot"><a href="/biblioteca">Ver la biblioteca en lista</a></p>}
+    </div>
+
+    <div id="panel" class="body detail" aria-live="polite" hidden></div>
+  </aside>
+
+  <nav id="legend" class="legend" aria-label="Mostrar u ocultar temas">
     {shown.map((t) => (
       <button type="button" data-theme={t.name} aria-pressed="true" style={`--c: ${t.color}`} data-mark={t.mark}><i aria-hidden="true"></i>{t.name}</button>
     ))}
   </nav>
+  <div class="zoom" role="group" aria-label="Zoom">
+    <button type="button" data-action="zoom-in" aria-label="Acercar" set:html={icon.plus} />
+    <button type="button" data-action="zoom-out" aria-label="Alejar" set:html={icon.minus} />
+    <button type="button" data-action="reset" aria-label="Ver todo el cielo" set:html={icon.target} />
+  </div>
 
-  <aside id="panel" class="panel" aria-label="Nota" aria-live="polite" hidden></aside>
-
-  <p class="hint">Arrastra para girar · rueda o pellizca para acercarte · toca una estrella</p>
+  <p class="hint">Arrastra para girar · pellizca o usa la rueda para acercarte · toca una estrella</p>
   {variant === 'page' && <>
     <p class="loading" role="status">Encendiendo {num(stars)} estrellas…</p>
     <div class="fallback">
-      <p>Tu navegador no puede mostrar la constelación en 3D.</p>
+      <p>Tu navegador no puede mostrar la nebulosa en 3D.</p>
       <a href="/biblioteca">Ver la biblioteca en lista</a>
     </div>
-    <noscript><div class="fallback show"><p>La constelación necesita JavaScript.</p><a href="/biblioteca">Ver la biblioteca en lista</a></div></noscript>
+    <noscript><div class="fallback show"><p>La nebulosa necesita JavaScript.</p><a href="/biblioteca">Ver la biblioteca en lista</a></div></noscript>
   </>}
   <p id="debug" class="debug" hidden></p>
 </Root>
 
 <style>
-  .sky { position: relative; height: 100dvh; overflow: hidden; background: #05060d; }
+  .sky {
+    --s-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', system-ui, sans-serif;
+    --s-l1: #f5f5f7; --s-l2: rgb(235 235 245 / 0.64); --s-l3: rgb(235 235 245 / 0.38);
+    --s-sep: rgb(255 255 255 / 0.1); --s-fill: rgb(118 118 128 / 0.24); --s-glass: rgb(28 28 34 / 0.62);
+    --s-stroke: rgb(255 255 255 / 0.13);
+    --side-w: 380px;
+    position: relative; height: 100dvh; overflow: hidden; background: #030409;
+    font-family: var(--s-font); color: var(--s-l1); -webkit-font-smoothing: antialiased;
+  }
   .sky.island { position: absolute; inset: 0; height: auto; background: none; z-index: 3; pointer-events: none; opacity: 0; transition: opacity 0.6s ease; }
   .sky.island[data-state='ready'] { opacity: 1; }
   .sky.island > :not(#labels) { pointer-events: auto; }
   .sky.island .hint { pointer-events: none; }
-  .back { font: 600 13px/1 var(--f-body); color: var(--ink); background: rgb(14 16 32 / 0.85); border: 1px solid rgb(255 255 255 / 0.16); border-radius: 99px; padding: 11px 14px; cursor: pointer; white-space: nowrap; }
-  .back:hover { border-color: rgb(255 255 255 / 0.35); }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  .sky :global(button) { font: inherit; color: inherit; }
+  .sky :focus-visible { outline: 2px solid #64a8ff; outline-offset: 2px; border-radius: 8px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  /* ---------------------------------------------------------------- glass */
+  .sidebar, .legend, .zoom, #search-results {
+    background: var(--s-glass); border: 0.5px solid var(--s-stroke);
+    -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+    box-shadow: 0 18px 50px rgb(0 0 0 / 0.45), inset 0 0.5px 0 rgb(255 255 255 / 0.1);
+  }
+
+  /* ---------------------------------------------------------------- labels on the sky
+     (metrics in LABEL_STYLE, src/constellation/app.ts). Small, in the system face, with a dark halo. */
   #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-  /* Labels (see LABEL_STYLE in src/constellation/app.ts for the matching metrics).
-     A star atlas: galaxy names in spaced small capitals, star names beside their star,
-     every name tinted with the colour of its theme. */
   #labels :global(.label) {
     position: absolute; left: 0; top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    font: 400 10.5px/14px var(--f-body); letter-spacing: 0.01em;
-    color: color-mix(in oklab, var(--c) 38%, #c4c8de);
-    text-shadow: 0 0 3px #05060d, 0 0 10px rgb(5 6 13 / 0.9);
+    font: 500 12px/16px var(--s-font); letter-spacing: -0.003em; color: rgb(255 255 255 / 0.82);
+    text-shadow: 0 0 2px #000, 0 0 8px rgb(0 0 0 / 0.9);
     opacity: 0; transition: opacity 0.35s ease; will-change: transform, opacity;
   }
-  #labels :global(.label.on) { opacity: 0.88; }
+  #labels :global(.label.on) { opacity: 1; }
   #labels :global(.label.measure) { visibility: hidden; opacity: 0; width: auto !important; max-width: none; transition: none; }
+  #labels :global(.label.book) { font-size: 12.5px; color: rgb(255 255 255 / 0.88); }
+  #labels :global(.label.concept), #labels :global(.label.near) { color: rgb(255 255 255 / 0.74); font-size: 11.5px; }
+  #labels :global(.label.near.book) { color: rgb(255 255 255 / 0.86); font-size: 12px; }
+  #labels :global(.label.focus) { font: 650 16px/22px var(--s-font); color: #fff; letter-spacing: -0.01em; }
+  #labels :global(.label.hover) {
+    font: 600 12.5px/26px var(--s-font); padding: 0 10px; border-radius: 99px; text-shadow: none; z-index: 2;
+    background: rgb(28 28 34 / 0.78); border: 0.5px solid var(--s-stroke);
+  }
   #labels :global(.label.theme) {
-    font: 600 11.5px/16px var(--f-display); letter-spacing: 0.3em; text-transform: uppercase; text-align: center; overflow: visible;
-    color: color-mix(in oklab, var(--c) 62%, #ffffff);
-    text-shadow: 0 0 14px color-mix(in oklab, var(--c) 75%, transparent), 0 0 3px #05060d;
+    display: flex; align-items: center; gap: 7px; overflow: visible; padding: 0 10px 0 9px;
+    font: 600 13px/28px var(--s-font); color: var(--s-l1); text-shadow: none; border-radius: 99px;
+    background: rgb(20 20 26 / 0.55); border: 0.5px solid var(--s-stroke);
   }
-  #labels :global(.label.theme.on) { opacity: 0.95; }
-  #labels :global(.label.book) {
-    font: italic 500 12px/16px var(--f-body); letter-spacing: 0;
-    color: color-mix(in oklab, var(--c) 28%, #eef0f8);
-  }
-  #labels :global(.label.near.book) { font-size: 11.5px; line-height: 15px; }
-  #labels :global(.label.concept.on), #labels :global(.label.near.on) { opacity: 0.8; }
-  #labels :global(.label.focus), #labels :global(.label.hover) {
-    font: 600 12.5px/24px var(--f-body); letter-spacing: 0; padding: 0 9px; border-radius: 6px; text-shadow: none;
-    color: #f4f5fb; background: rgb(7 8 18 / 0.82);
-    border: 1px solid color-mix(in oklab, var(--c) 55%, transparent);
-    box-shadow: 0 0 18px color-mix(in oklab, var(--c) 28%, transparent);
-  }
-  #labels :global(.label.hover) { font-weight: 500; font-size: 12px; line-height: 22px; padding: 0 8px; z-index: 2; }
-  #labels :global(.label.focus.on), #labels :global(.label.hover.on) { opacity: 1; }
+  #labels :global(.label.theme i) { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+  #labels :global(.label.theme[data-mark='ring'] i) { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+  #labels :global(.label.theme b) { font-weight: 600; color: var(--s-l2); font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { #labels :global(.label) { transition: none; } }
 
-  .bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgb(5 6 13 / 0.85), transparent); z-index: 3; }
-  .brand { font: 700 15px/1 var(--f-display); text-decoration: none; white-space: nowrap; }
-  .list { font-size: 13px; color: var(--ink-2); white-space: nowrap; text-underline-offset: 3px; }
-  .search { position: relative; flex: 1; max-width: 420px; margin-left: auto; }
-  .search input { width: 100%; font: 400 14px/1 var(--f-body); color: var(--ink); background: rgb(14 16 32 / 0.85); border: 1px solid rgb(255 255 255 / 0.16); border-radius: 10px; padding: 11px 13px; }
-  .search input::placeholder { color: var(--ink-3); }
-  .search input:focus { outline: 2px solid var(--dusk); outline-offset: 1px; }
-  #search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; list-style: none; margin: 0; padding: 6px; background: rgb(10 11 24 / 0.97); border: 1px solid rgb(255 255 255 / 0.14); border-radius: 12px; display: grid; gap: 2px; }
-  #search-results :global(li) { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-  #search-results :global(li[aria-selected='true']), #search-results :global(li:hover) { background: rgb(255 255 255 / 0.08); }
-  #search-results :global(li span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #search-results :global(li small) { color: var(--ink-3); font-size: 12px; }
-  .sky :global(i[style*='--c']) { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); flex: none; display: inline-block; }
-  .sky :global(i[data-mark='ring']) { background: transparent; border: 2px solid var(--c); box-shadow: none; }
-
-  .legend { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 6px; z-index: 3; max-width: calc(100% - 32px); }
-  .legend button { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--f-body); color: var(--ink); background: rgb(14 16 32 / 0.85); border: 1px solid rgb(255 255 255 / 0.14); border-radius: 99px; padding: 8px 12px; cursor: pointer; }
-  .legend button i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
-  .legend button[data-mark='ring'] i { background: transparent; border: 2px solid var(--c); box-shadow: none; }
-  .legend button[aria-pressed='false'] { opacity: 0.4; }
-  .legend button:hover { border-color: rgb(255 255 255 / 0.35); }
-
-  .panel { position: absolute; top: 70px; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; width: min(420px, calc(100% - 32px)); overflow: auto; overscroll-behavior: contain; z-index: 4; background: rgb(9 10 22 / 0.94); border: 1px solid rgb(255 255 255 / 0.12); border-radius: 16px; padding: 18px 20px 24px; display: grid; gap: 12px; align-content: start; backdrop-filter: blur(8px); }
-  .panel :global(.panel-top) { display: flex; justify-content: space-between; align-items: center; }
-  .panel :global(.kind) { font: 600 11px/1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dusk); }
-  .panel :global(.close) { background: none; border: 1px solid var(--line); color: var(--ink-2); border-radius: 8px; padding: 6px 9px; cursor: pointer; }
-  .panel :global(h2) { font: 800 clamp(20px, 2.4vw, 26px)/1.1 var(--f-display); letter-spacing: -0.01em; outline: none; }
-  .panel :global(.byline) { color: var(--ink-2); font-size: 14px; }
-  .panel :global(.chip) { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 11px; border-radius: 99px; background: rgb(255 255 255 / 0.06); }
-  .panel :global(.chip i) { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
-  .panel :global(.chip[data-mark='ring'] i) { background: transparent; border: 2px solid var(--c); box-shadow: none; }
-  .panel :global(.actions) { display: flex; flex-wrap: wrap; gap: 8px; }
-  .panel :global(.actions a), .panel :global(.actions button) { font: 500 13px/1 var(--f-body); color: var(--ink); text-decoration: none; background: rgb(255 255 255 / 0.07); border: 1px solid var(--line); border-radius: 99px; padding: 8px 12px; cursor: pointer; }
-  .panel :global(.tour) { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-2); background: rgb(165 151 255 / 0.12); border-radius: 10px; padding: 6px; }
-  .panel :global(.tour span) { flex: 1; }
-  .panel :global(.tour button) { background: rgb(255 255 255 / 0.08); color: var(--ink); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-  .panel :global(.tour button:disabled) { opacity: 0.35; cursor: default; }
-  .panel :global(.prose) { font-size: 15px; line-height: 1.65; overflow-wrap: break-word; }
-  .panel :global(.prose p), .panel :global(.prose ul), .panel :global(.prose ol) { margin: 0 0 0.9em; }
-  .panel :global(.prose ul), .panel :global(.prose ol) { padding-left: 1.2em; }
-  .panel :global(.prose h2) { font: 700 17px/1.3 var(--f-display); margin: 1.2em 0 0.5em; }
-  .panel :global(.prose a) { color: var(--ink); text-decoration-color: var(--dusk-2); text-underline-offset: 3px; }
-  .panel :global(.prose strong) { color: #fff; }
-  .panel :global(.prose .katex-display) { overflow-x: auto; overflow-y: hidden; }
-  .panel :global(.loading-text) { color: var(--ink-3); }
-  .panel :global(section h3) { font: 700 14px/1.2 var(--f-display); display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; }
-  .panel :global(section h3 span) { font: 500 12px/1 var(--f-mono); color: var(--ink-3); }
-  .panel :global(.links) { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-  .panel :global(.links a) { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; font-size: 13.5px; color: var(--ink-2); text-decoration: none; }
-  .panel :global(.links a:hover) { background: rgb(255 255 255 / 0.06); color: var(--ink); }
-  .panel :global(.more a) { font-size: 13px; color: var(--ink-2); }
-
-  .hint { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); margin: 0; font-size: 12px; color: var(--ink-3); z-index: 2; pointer-events: none; }
-  .sky[data-panel='open'] .hint { display: none; }
-  .loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: 500 15px/1 var(--f-body); color: var(--ink-2); pointer-events: none; transition: opacity 0.6s; }
-  .sky:not([data-state='loading']) .loading { opacity: 0; }
-  .fallback { position: absolute; inset: 0; display: none; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 24px; z-index: 5; background: #05060d; }
-  .fallback a { color: var(--ink); }
-  .sky[data-state='fallback'] .fallback, .fallback.show { display: grid; }
-  .debug { position: absolute; left: 16px; top: 70px; margin: 0; font: 500 12px/1.4 var(--f-mono); color: #9fe0b5; background: rgb(0 0 0 / 0.6); padding: 6px 9px; border-radius: 8px; z-index: 6; }
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-  @media (max-width: 720px) {
-    #labels :global(.label.theme) { font-size: 10.5px; letter-spacing: 0.16em; }
-    .bar { flex-wrap: wrap; }
-    .search { order: 3; flex-basis: 100%; max-width: none; }
-    .list { margin-left: auto; }
-    .legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; right: 16px; }
-    .legend button { flex: none; }
-    .hint { display: none; }
-    .panel { top: auto; left: 12px; right: 12px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 58dvh; border-radius: 16px; }
+  /* ---------------------------------------------------------------- the panel */
+  .sidebar {
+    position: absolute; z-index: 4; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(16px + env(safe-area-inset-top, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: var(--side-w);
+    border-radius: 26px; display: flex; flex-direction: column; overflow: hidden;
+    transition: bottom 0.45s cubic-bezier(0.3, 0.9, 0.3, 1), transform 0.45s cubic-bezier(0.3, 0.9, 0.3, 1), border-radius 0.3s;
   }
+  .grabber { display: none; }
+  .side-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 16px 10px 20px; }
+  .brand { font: 650 15px/1 var(--s-font); color: var(--s-l1); text-decoration: none; }
+  .back { font: 600 14px/1 var(--s-font); color: var(--s-l1); background: rgb(255 255 255 / 0.08); border: 0.5px solid var(--s-stroke); border-radius: 99px; padding: 9px 13px; cursor: pointer; white-space: nowrap; }
+  .back:hover { background: rgb(255 255 255 / 0.14); }
+  .icon-btn { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 0.07); border: 0; cursor: pointer; color: var(--s-l2); }
+  .icon-btn:hover { color: var(--s-l1); background: rgb(255 255 255 / 0.13); }
+  .icon-btn :global(svg), .glyph :global(svg), .zoom :global(svg) { width: 18px; height: 18px; }
+
+  .search { position: relative; margin: 0 16px 6px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 12px; background: var(--s-fill); }
+  .glyph { color: var(--s-l3); display: grid; }
+  .search input { flex: 1; min-width: 0; font: 400 15px/1 var(--s-font); color: var(--s-l1); background: none; border: 0; outline: none; padding: 0; }
+  .search input::placeholder { color: var(--s-l3); }
+  .search input::-webkit-search-cancel-button { filter: invert(1) opacity(0.5); }
+  .search:focus-within { box-shadow: 0 0 0 2px rgb(100 168 255 / 0.7); }
+  kbd { font: 500 11px/1 var(--s-font); color: var(--s-l3); border: 0.5px solid var(--s-stroke); border-radius: 6px; padding: 3px 6px; }
+  #search-results { position: absolute; top: calc(100% + 8px); left: -4px; right: -4px; list-style: none; margin: 0; padding: 6px; border-radius: 16px; display: grid; gap: 2px; z-index: 6; }
+  #search-results :global(li) { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-size: 14px; }
+  #search-results :global(li[aria-selected='true']), #search-results :global(li:hover) { background: rgb(255 255 255 / 0.1); }
+  #search-results :global(li span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #search-results :global(li small) { color: var(--s-l3); font-size: 12px; }
+
+  .body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 10px 16px 20px; display: grid; gap: 16px; align-content: start; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.2) transparent; }
+  .title h1 { font: 700 30px/1.1 var(--s-font); letter-spacing: -0.025em; margin: 0; }
+  .title p { margin: 2px 0 0; font-size: 14px; color: var(--s-l2); }
+  .seg { display: flex; padding: 2px; border-radius: 10px; background: var(--s-fill); }
+  .seg button { flex: 1; border: 0; background: none; font: 600 13px/30px var(--s-font); border-radius: 8px; cursor: pointer; }
+  .seg button[aria-selected='true'] { background: rgb(255 255 255 / 0.2); box-shadow: 0 3px 8px rgb(0 0 0 / 0.2); }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card {
+    display: grid; align-content: space-between; gap: 18px; min-height: 96px; padding: 14px; text-align: left; cursor: pointer; border-radius: 18px;
+    background: linear-gradient(150deg, color-mix(in srgb, var(--c) 34%, transparent), color-mix(in srgb, var(--c) 8%, transparent));
+    border: 0.5px solid color-mix(in srgb, var(--c) 42%, transparent); transition: transform 0.16s, filter 0.16s;
+  }
+  .card:hover { filter: brightness(1.15); }
+  .card:active { transform: scale(0.97); }
+  .card i { width: 24px; height: 24px; border-radius: 8px; background: var(--c); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 70%, transparent); }
+  .card[data-mark='ring'] i { background: transparent; box-shadow: inset 0 0 0 3px var(--c); }
+  .card b { display: block; font: 650 15px/1.2 var(--s-font); }
+  .card small, .row small { display: block; font: 500 12.5px/1.3 var(--s-font); color: var(--s-l2); }
+  .rows { display: grid; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border: 0; border-top: 0.5px solid var(--s-sep); background: none; text-align: left; cursor: pointer; color: var(--s-l1); text-decoration: none; border-radius: 0; }
+  .row:first-of-type { border-top: 0; }
+  .row:hover { background: rgb(255 255 255 / 0.05); }
+  .row > span:not(.badge):not(.chev) { flex: 1; min-width: 0; }
+  .row b { display: block; font: 500 15px/1.3 var(--s-font); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+  .dot[data-mark='ring'] { background: transparent; box-shadow: inset 0 0 0 2px var(--c); }
+  .badge { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; color: var(--c); background: color-mix(in srgb, var(--c) 22%, transparent); }
+  .badge :global(svg), .chev :global(svg) { width: 18px; height: 18px; }
+  .chev { color: var(--s-l3); display: grid; }
+  .note { margin: 0 0 4px; font-size: 13px; color: var(--s-l2); }
+  .foot { margin: 0; font-size: 13px; }
+  .foot a { color: var(--s-l2); text-underline-offset: 3px; }
+
+  /* the card of a star */
+  .detail :global(.back-link) { justify-self: start; display: inline-flex; align-items: center; gap: 2px; font: 500 15px/1 var(--s-font); color: var(--c, #64a8ff); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+  .detail :global(.back-link svg) { width: 18px; height: 18px; }
+  .detail :global(.tour) { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--s-l2); background: rgb(255 255 255 / 0.06); border-radius: 12px; padding: 6px; }
+  .detail :global(.tour span) { flex: 1; text-align: center; }
+  .detail :global(.tour button) { width: 32px; height: 32px; border-radius: 9px; border: 0; background: rgb(255 255 255 / 0.1); cursor: pointer; }
+  .detail :global(.tour button:disabled) { opacity: 0.3; cursor: default; }
+  .detail :global(.head) { display: grid; gap: 6px; }
+  .detail :global(.chip) { justify-self: start; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; font: 500 13px/1 var(--s-font); color: color-mix(in srgb, var(--c) 70%, white); background: color-mix(in srgb, var(--c) 18%, transparent); margin: 0; }
+  .detail :global(.chip i) { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .detail :global(.chip[data-mark='ring'] i) { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+  .detail :global(h2) { font: 700 28px/1.12 var(--s-font); letter-spacing: -0.022em; margin: 4px 0 0; outline: none; }
+  .detail :global(.byline) { margin: 0; font-size: 15px; color: var(--s-l2); }
+  .detail :global(.stats) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 14px; background: rgb(255 255 255 / 0.05); }
+  .detail :global(.stats div) { padding: 11px 12px; }
+  .detail :global(.stats div + div) { border-left: 0.5px solid var(--s-sep); }
+  .detail :global(.stats b) { display: block; font: 700 20px/1.15 var(--s-font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .detail :global(.stats span) { font: 500 12px/1.3 var(--s-font); color: var(--s-l2); }
+  .detail :global(.actions) { display: flex; gap: 8px; }
+  .detail :global(.actions > *) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 99px; font: 600 14px/1 var(--s-font); text-decoration: none; cursor: pointer; background: rgb(255 255 255 / 0.08); border: 0.5px solid var(--s-stroke); color: var(--s-l1); }
+  .detail :global(.actions .primary) { flex: 1; background: #f5f5f7; color: #0b0b0f; border-color: transparent; }
+  .detail :global(.actions svg) { width: 16px; height: 16px; }
+  .detail :global(h3) { font: 600 12px/1 var(--s-font); letter-spacing: 0.02em; text-transform: uppercase; color: var(--s-l2); margin: 0 0 10px; display: flex; gap: 6px; }
+  .detail :global(h3 span) { color: var(--s-l3); font-variant-numeric: tabular-nums; }
+  .detail :global(.ideas) { display: flex; flex-wrap: wrap; gap: 7px; }
+  .detail :global(.ideas a) { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 99px; font: 500 13px/1 var(--s-font); color: var(--s-l1); text-decoration: none; background: rgb(255 255 255 / 0.07); border: 0.5px solid var(--s-sep); }
+  .detail :global(.ideas a:hover) { background: rgb(255 255 255 / 0.13); }
+  .detail :global(.links) { list-style: none; margin: 0; padding: 0; display: grid; }
+  .detail :global(.links a) { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-top: 0.5px solid var(--s-sep); color: var(--s-l1); text-decoration: none; }
+  .detail :global(.links li:first-child a) { border-top: 0; }
+  .detail :global(.links a:hover) { background: rgb(255 255 255 / 0.05); }
+  .detail :global(.links span) { flex: 1; min-width: 0; font: 500 15px/1.3 var(--s-font); }
+  .detail :global(.links small) { display: block; font: 400 13px/1.3 var(--s-font); color: var(--s-l2); }
+  .detail :global(.links i) { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+  .detail :global(.links i[data-mark='ring']) { background: transparent; box-shadow: inset 0 0 0 2px var(--c); }
+  .detail :global(.prose) { font-size: 15px; line-height: 1.6; overflow-wrap: break-word; color: rgb(245 245 247 / 0.9); }
+  .detail :global(.prose p), .detail :global(.prose ul), .detail :global(.prose ol) { margin: 0 0 0.9em; }
+  .detail :global(.prose ul), .detail :global(.prose ol) { padding-left: 1.2em; }
+  .detail :global(.prose h2) { font: 650 17px/1.3 var(--s-font); margin: 1.2em 0 0.5em; }
+  .detail :global(.prose a) { color: #8ec0ff; text-decoration: none; }
+  .detail :global(.prose strong) { color: #fff; }
+  .detail :global(.prose .katex-display) { overflow-x: auto; overflow-y: hidden; }
+  .detail :global(.loading-text) { color: var(--s-l3); }
+
+  /* ---------------------------------------------------------------- floating controls */
+  .legend {
+    position: absolute; z-index: 3; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: calc(var(--side-w) + 32px + (100% - var(--side-w) - 48px) / 2); transform: translateX(-50%);
+    display: flex; gap: 6px; padding: 6px; border-radius: 24px; max-width: calc(100% - var(--side-w) - 64px); overflow-x: auto; scrollbar-width: none;
+    transition: left 0.45s cubic-bezier(0.3, 0.9, 0.3, 1), max-width 0.45s;
+  }
+  .legend button { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; font: 500 13px/1 var(--s-font); border-radius: 99px; cursor: pointer; white-space: nowrap; background: rgb(255 255 255 / 0.07); border: 0.5px solid var(--s-sep); }
+  .legend button i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .legend button[data-mark='ring'] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+  .legend button[aria-pressed='false'] { opacity: 0.4; }
+  .legend button:hover { background: rgb(255 255 255 / 0.13); }
+  .zoom { position: absolute; z-index: 3; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: grid; border-radius: 16px; overflow: hidden; }
+  .zoom button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; cursor: pointer; }
+  .zoom button + button { border-top: 0.5px solid var(--s-sep); }
+  .zoom button:hover { background: rgb(255 255 255 / 0.08); }
+  .hint { position: absolute; z-index: 2; top: calc(22px + env(safe-area-inset-top, 0px)); right: max(20px, env(safe-area-inset-right, 0px)); margin: 0; font-size: 12.5px; color: var(--s-l3); pointer-events: none; }
+  .sky.island .hint { right: auto; left: calc(var(--side-w) + 40px); }
+
+  /* folded: the panel shrinks to its top bar and the whole sky is free (the "glass" view) */
+  .sky[data-panel='collapsed'] .sidebar { bottom: auto; }
+  .sky[data-panel='collapsed'] .body { display: none; }
+  .sky[data-panel='collapsed'] .search { margin-bottom: 14px; }
+  .sky[data-panel='collapsed'] .legend { left: 50%; max-width: calc(100% - 140px); }
+
+  /* ---------------------------------------------------------------- phones: a sheet from the bottom */
+  @media (max-width: 720px) {
+    .sidebar {
+      left: 0; right: 0; top: auto; bottom: 0; width: auto; height: min(52dvh, 470px); border-radius: 26px 26px 0 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px); border-bottom: 0;
+    }
+    .sky[data-focus] .sidebar { height: min(60dvh, 560px); }
+    .sky[data-panel='collapsed'] .sidebar { height: auto; bottom: 0; }
+    .grabber { display: block; width: 100%; height: 22px; padding: 0; border: 0; background: none; cursor: grab; flex: none; touch-action: none; }
+    .grabber span { display: block; width: 38px; height: 5px; border-radius: 3px; background: rgb(255 255 255 / 0.3); margin: 9px auto 0; }
+    .side-top { padding: 4px 14px 8px 18px; }
+    .side-top .icon-btn { display: none; }
+    .search { margin: 0 14px 6px; }
+    .body { padding: 8px 14px 18px; }
+    .legend { top: calc(12px + env(safe-area-inset-top, 0px)); bottom: auto; left: 12px; right: 12px; transform: none; max-width: none; border-radius: 20px; }
+    .sky[data-panel='collapsed'] .legend { left: 12px; max-width: none; }
+    .zoom, .hint, kbd { display: none; }
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
+
+  .loading, .fallback { position: absolute; inset: 0; display: grid; place-items: center; place-content: center; gap: 12px; text-align: center; color: var(--s-l2); font-size: 15px; z-index: 5; pointer-events: none; margin: 0; }
+  .sky[data-state='ready'] .loading, .sky[data-state='fallback'] .loading { display: none; }
+  .fallback { display: none; pointer-events: auto; background: #030409; }
+  .fallback a { color: var(--s-l1); }
+  .sky[data-state='fallback'] .fallback, .fallback.show { display: grid; }
+  .sky[data-state='fallback'] > :not(.fallback) { visibility: hidden; }
+  .debug { position: absolute; left: calc(var(--side-w) + 32px); top: 18px; margin: 0; z-index: 5; font: 500 11px/1.4 ui-monospace, monospace; color: #7dff9e; pointer-events: none; }
 </style>

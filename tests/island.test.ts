@@ -89,3 +89,19 @@ describe('hoofprints', () => {
     expect(prints.count()).toBe(1);
   });
 });
+
+describe('the bottles on the beach', () => {
+  it('wash up all round the island, where the bull can reach them, never by the jetty', async () => {
+    const { shoreSpots } = await import('../src/island/bottles');
+    const spots = shoreSpots();
+    expect(spots.length).toBeGreaterThan(30);
+    for (const s of spots) {
+      expect(walkable(s.x, s.z)).toBe(true);
+      expect(height(s.x, s.z)).toBeLessThan(0.7);
+      expect(Math.abs(s.x - JETTY.x) < 14 && s.z > JETTY.z0 - 10).toBe(false);
+    }
+    // on every side of the island
+    const sides = new Set(spots.map((s) => Math.round(Math.atan2(s.x, s.z) / (Math.PI / 2))));
+    expect(sides.size).toBeGreaterThanOrEqual(4);
+  });
+});

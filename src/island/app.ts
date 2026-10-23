@@ -19,7 +19,9 @@ import { createShared } from './shaders';
 import { createLibrarySky } from './stars';
 import { createVisit } from './observatory';
 import { createPavilion } from './pavilion';
+import { createBottles, shoreSpots } from './bottles';
 import { appPath, START } from './warrenia';
+import { createWhale } from './whale';
 import {
   DOORS, JETTY, PATHS, SITES, groundAt, height, surfaceAt, walkable, type SiteId,
 } from './terrain';
@@ -271,7 +273,9 @@ export async function startIsland({ root, places }: IslandOptions) {
 
   // ---------------------------------------------------------------- camera
   const camPos = new THREE.Vector3(me.x + 30, 40, me.z + 60), camLook = new THREE.Vector3(me.x, 2, me.z);
-  const want = new THREE.Vector3(), look = new THREE.Vector3();
+  const want = new THREE.Vector3(), look = new THREE.Vector3(), tmpLook = new THREE.Vector3();
+  /** 0…1: how far the camera has turned to the sea (the bull looking out from the jetty's end). */
+  let gaze = 0;
   function cameraTarget(now: number) {
     if (mode === 'aerial') {
       const a = now * 0.05;
@@ -284,6 +288,12 @@ export async function startIsland({ root, places }: IslandOptions) {
     const back = 10 + Math.min(4, Math.abs(me.speed) * 0.5);
     want.set(me.x - Math.sin(me.heading) * back, by + 6, me.z - Math.cos(me.heading) * back);
     look.set(me.x, by + 1.4, me.z);
+    // standing still at the end of the jetty, looking out: the camera comes down and looks at the sea
+    if (gaze > 0) {
+      const k = gaze * gaze * (3 - 2 * gaze);
+      want.y -= 2.6 * k;
+      look.lerp(tmpLook.set(me.x + Math.sin(me.heading) * 26, 2.2, me.z + Math.cos(me.heading) * 26), k);
+    }
     // never under the ground, and never with a hill between the camera and the bull
     want.y = Math.max(want.y, height(want.x, want.z) + 2);
     for (let i = 1; i < 10; i++) {
@@ -365,6 +375,41 @@ export async function startIsland({ root, places }: IslandOptions) {
     if (location.hash.startsWith('#observatorio')) history.pushState(null, '', location.pathname + location.search);
   }
   skyRoot.querySelector('[data-sky-exit]')!.addEventListener('click', goDown);
+
+  // ---------------------------------------------------------------- secrets: nothing announces them
+  // a whale, for whoever stands still at the end of the jetty looking out to sea (whale.ts)
+  // (off to the right of the jetty's line, so the bull in the foreground never hides it)
+  const whale = createWhale(scene, new THREE.Vector3(JETTY.x - 11, 0, JETTY.z1 + 16), audio);
+  // a bottle on the beach with an idea from the library inside (bottles.ts)
+  const bottles = createBottles(scene, shoreSpots());
+  const note = {
+    root: $('[data-bottle]'), title: $('[data-bottle-title]'), text: $('[data-bottle-text]'), go: $<HTMLAnchorElement>('[data-bottle-go]'),
+    slug: '', at: { x: 0, z: 0 },
+  };
+  async function openBottle() {
+    audio.pop();
+    const m = await bottles.message();
+    if (!m) return;
+    note.slug = m.s;
+    note.at = { x: me.x, z: me.z };
+    note.title.textContent = m.t;
+    note.text.textContent = m.d;
+    note.go.href = `/constelacion#${m.s}`;
+    note.root.hidden = false;
+  }
+  const closeBottle = () => { note.root.hidden = true; };
+  $('[data-bottle-close]').addEventListener('click', closeBottle);
+  note.go.addEventListener('click', (e) => { e.preventDefault(); closeBottle(); goUp(note.slug); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !note.root.hidden) closeBottle(); });
+  function updateSecrets(dt: number, now: number, nowMs: number) {
+    const watching = idle() && mode === 'follow' && Math.abs(me.x - JETTY.x) < 1.6 && me.z > JETTY.z1 - 5 && Math.abs(me.speed) < 0.3 && Math.cos(me.heading) > 0.5;
+    whale.update(dt, nowMs, watching);
+    // (slowly towards the sea while the bull waits or the whale is up; quickly back when it moves)
+    gaze = THREE.MathUtils.clamp(gaze + dt * (watching || whale.state !== 'hidden' ? 0.3 : -1.2), 0, 1);
+    if (idle() && bottles.update(dt, now, me, world.seaLevel)) openBottle();
+    // the message stays while the bull is near where it was opened
+    if (!note.root.hidden && (!idle() || Math.hypot(me.x - note.at.x, me.z - note.at.z) > 12)) closeBottle();
+  }
 
   // ---------------------------------------------------------------- the pavilion: into WarrenIA
   const demoHost = root.querySelector<HTMLElement>('[data-warrenia]')!;
@@ -479,6 +524,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     renderer.toneMappingExposure *= 1 - 0.97 * v.dark;
     world.setFade(v.hide);
     world.update(dt, now, night);
+    updateSecrets(dt, now, nowMs);
     prints.wash(world.seaLevel);
     dust.step(dt, now, night);
     birds.update(dt, now, shared.bull.value, night);
@@ -527,6 +573,8 @@ export async function startIsland({ root, places }: IslandOptions) {
     get tier() { return tier; },
     get night() { return night; },
     get here() { return here; },
+    get whale() { return { state: whale.state, seen: whale.seen }; },
+    get bottle() { return bottles.at; },
     get mode() { return mode; },
     get bull() { return { x: me.x, z: me.z, heading: me.heading, speed: me.speed, gait: { ...bull.weights }, stride: { name: bull.gait.name, f: bull.gait.f, D: bull.gait.D } }; },
     get prints() { return prints.count(); },

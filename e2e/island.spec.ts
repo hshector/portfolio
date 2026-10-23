@@ -18,6 +18,8 @@ type Isla = {
   flocks: { x: number; z: number }[];
   visit: string;
   pavilion: string;
+  whale: { state: string; seen: number };
+  bottle: { x: number; z: number } | null;
   demoPath: string | null;
   place(x: number, z: number, heading: number): void;
 };
@@ -243,4 +245,34 @@ test('without WebGL the projects are still one click away', async ({ page }) => 
   await expect(page.getByText('Tu navegador no puede mostrar la isla en 3D.')).toBeVisible();
   await page.getByRole('link', { name: 'Ver los proyectos' }).click();
   await expect(page.getByRole('heading', { name: 'WarrenIA' })).toBeInViewport();
+});
+
+// The secrets: nothing on screen announces them.
+test('a whale surfaces for whoever stands still at the end of the jetty, looking out to sea', async ({ page }) => {
+  const errors = await open(page);
+  expect(await isla(page, (i) => i.whale.seen)).toBe(0);
+  await isla(page, (i) => i.place(0, 73, 0));
+  await expect.poll(() => isla(page, (i) => i.whale.seen), { timeout: 90_000 }).toBe(1);
+  expect(await isla(page, (i) => i.whale.state)).toBe('surfacing');
+  expect(errors).toEqual([]);
+});
+
+test('a bottle on the beach holds an idea from the library, and leads up to it in the sky', async ({ page }) => {
+  const errors = await open(page);
+  await expect(page.locator('[data-bottle]')).toBeHidden();
+  const at = (await isla(page, (i) => i.bottle))!;
+  expect(at).not.toBeNull();
+  await isla(page, (i, a) => i.place(a.x, a.z, 0), at);
+  const note = page.locator('[data-bottle]');
+  await expect(note).toBeVisible({ timeout: 30_000 });
+  await expect(note.getByRole('heading', { level: 2 })).not.toBeEmpty();
+  const go = note.getByRole('link', { name: 'Verla en el cielo' });
+  const slug = (await go.getAttribute('href'))!.split('#')[1];
+  expect(slug.length).toBeGreaterThan(0);
+  // the bottle is gone (another washes up later, elsewhere)
+  expect(await isla(page, (i) => i.bottle)).toBeNull();
+  await go.click();
+  await expect(note).toBeHidden();
+  await expect.poll(() => isla(page, (i) => i.visit), { timeout: 90_000 }).toBe('sky');
+  expect(errors).toEqual([]);
 });

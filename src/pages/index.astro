@@ -52,6 +52,13 @@ const places = {
       </div>
     </header>
 
+    <aside class="bottle-note" data-bottle role="dialog" aria-labelledby="bottle-title" hidden>
+      <button type="button" class="close" data-bottle-close aria-label="Cerrar el mensaje">✕</button>
+      <p class="from">Un mensaje en una botella</p>
+      <h2 id="bottle-title" data-bottle-title></h2>
+      <p data-bottle-text></p>
+      <a class="go" data-bottle-go href="/constelacion">Verla en el cielo</a>
+    </aside>
     <div class="prompt" data-prompt hidden>
       <h2 data-prompt-title></h2>
       <p data-prompt-text></p>
@@ -206,6 +213,15 @@ const places = {
   .prompt .key { position: absolute; right: 14px; top: 14px; font: 600 11px/1 var(--f-mono); padding: 5px 7px; border-radius: 6px; border: 1px solid rgb(255 255 255 / 0.3); }
   @media (pointer: coarse) { .prompt .key { display: none; } }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  /* the message from a bottle: a scrap of old paper */
+  .bottle-note { position: absolute; z-index: 5; left: 50%; bottom: max(70px, calc(env(safe-area-inset-bottom, 0px) + 60px)); width: min(420px, calc(100% - 28px)); transform: translateX(-50%) rotate(-0.8deg); padding: 22px 24px 20px; border-radius: 6px 10px 8px 12px; display: grid; gap: 10px; color: #2b1d10; background: radial-gradient(circle at 20% 15%, #f8eed6, #ecdcb6 70%, #e2cc9c); box-shadow: 0 18px 50px rgb(0 0 0 / 0.45), inset 0 0 40px rgb(140 100 50 / 0.25); animation: unroll 0.5s ease-out; }
+  .bottle-note .from { font: 600 11.5px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: #8a6a3e; }
+  .bottle-note h2 { font: 800 22px/1.15 var(--f-display); color: #24170b; }
+  .bottle-note p:not(.from) { font-size: 15px; line-height: 1.55; color: #3b2a18; }
+  .bottle-note .close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border: 0; border-radius: 99px; background: rgb(60 40 20 / 0.1); color: #3b2a18; cursor: pointer; }
+  .bottle-note .go { color: #f8eed6; background: #3b2a18; }
+  @keyframes unroll { from { opacity: 0; transform: translateX(-50%) translateY(14px) rotate(-3deg) scaleY(0.6); } }
+  @media (prefers-reduced-motion: reduce) { .bottle-note { animation: none; } }
   .go { justify-self: start; font: 600 14px/1 var(--f-body); color: #0b0c14; background: linear-gradient(120deg, var(--dusk), var(--dusk-2)); border: 0; border-radius: 99px; padding: 11px 16px; text-decoration: none; cursor: pointer; }
 
   .hint { position: absolute; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); font-size: 12.5px; padding: 8px 14px; border-radius: 99px; white-space: nowrap; pointer-events: none; transition: opacity 0.8s; }

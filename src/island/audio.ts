@@ -172,6 +172,25 @@ export class IslandAudio {
     g.connect(this.buses.music);
   }
 
+  /** Filtered noise: a whale's blow (a breathy whoosh) or its splash (a deep crash), far off. */
+  private surf(freq: number, q: number, attack: number, dur: number, amp: number) {
+    if (!this.ctx || !this.on) return;
+    const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(this.buses.waves); s.start(t, Math.random() * 2); s.stop(t + dur + 0.05);
+  }
+  blow() { this.surf(900, 0.8, 0.08, 1.2, 0.5); }
+  splash() { this.surf(260, 0.6, 0.03, 1.8, 0.9); }
+  /** The cork coming out of a bottle. */
+  pop() {
+    if (!this.ctx || !this.on) return;
+    const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(260, t + 0.08);
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g).connect(this.buses.hooves); o.start(t); o.stop(t + 0.14);
+  }
+
   /** One hoof landing; strength 0…1 (galloping is louder). */
   hoof(surface: Surface, strength: number, pan = 0) {
     if (!this.ctx || !this.on) return;

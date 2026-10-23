@@ -74,6 +74,18 @@ const graph = buildGraph(lib);
 writeFileSync(join(publicData, 'graph.json'), JSON.stringify(graph.meta));
 writeFileSync(join(publicData, 'graph.bin'), graph.bin);
 
+// The messages in the island's bottles: ideas that appear in three books or more, each with the first
+// sentence of its definition (src/island/bottles.ts).
+const firstSentence = (text: string) => {
+  const m = text.match(/^(.{60,}?[.!?])\s/);
+  return m ? m[1] : text;
+};
+const bottles = lib.notes
+  .filter((n) => n.kind === 'concept' && n.related.length >= 3)
+  .map((n) => ({ s: n.slug, t: n.title, d: firstSentence(excerpt(n.markdown, 280)), b: n.related.length }))
+  .filter((m) => m.d.length > 40);
+writeFileSync(join(publicData, 'bottles.json'), JSON.stringify(bottles));
+
 const md = [
   '# Informe de la biblioteca',
   '',

@@ -37,12 +37,13 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 - `scripts/check-dist.ts`: enlaces internos, que ningún libro publique sus notas privadas y límites de Cloudflare.
 - URLs: `/biblioteca/<slug>` para libros y conceptos, `/biblioteca/tema/<id>` para temáticas.
 
-## La nebulosa (antes «constelación», fase F2)
+## La red de ideas (antes «constelación» y «nebulosa», fase F2)
 
-- La nebulosa: `src/constellation/` + `src/components/ConstellationUI.astro`, dentro de la isla (observatorio) y en
+- La red: `src/constellation/` + `src/components/ConstellationUI.astro`, dentro de la isla (observatorio) y en
   `/constelacion`. Diseño elegido por Héctor: panel al estilo Apple Maps (Temas/Libros/Recorridos y ficha) que se
-  pliega para ver el cielo entero; fuente del sistema e Inter, cristal, gas de color con bloom. Detalle en
-  `docs/CONSTELLATION.md`. three.js `WebGLRenderer` (no WebGPU, medido). `/constelacion#<slug>` enfoca una nota.
+  pliega para ver el cielo entero; fuente del sistema e Inter, cristal. El cielo es una red al estilo Obsidian:
+  todas las líneas con color, pulsos de luz y bloom solo en estrellas y pulsos (el gas se quitó porque lo
+  emborronaba). Detalle en `docs/CONSTELLATION.md`. three.js `WebGLRenderer` (no WebGPU, medido). `/constelacion#<slug>` enfoca una nota.
 - `style.ts` es el aspecto de las estrellas compartido con el cielo de la isla: si cambia, el paso del
   observatorio sigue siendo continuo. Los recorridos sugeridos están en `routes.ts`.
 - `?debug` muestra fps y calidad. `window.__constellation` es la API que usan los tests E2E.

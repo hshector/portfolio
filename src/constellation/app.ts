@@ -34,6 +34,8 @@ let hashPrefix = '';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const debug = new URLSearchParams(location.search).has('debug');
+/** ?calidad=alta keeps bloom and pulses on whatever the frame rate (to judge them on a slow machine). */
+const pinnedQuality = new URLSearchParams(location.search).get('calidad') === 'alta';
 const fmt = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
 const DATED = /\b(1[5-9]\d\d|20[0-2]\d)\b/;
 
@@ -352,7 +354,7 @@ class App {
       w.t = now;
       w.frames = 0;
       // Adaptive quality: after the intro, step down while the device stays under 45 fps.
-      if (now - this.startedAt > 3000 && w.fps < 45 && this.quality < 2) this.setQuality(this.quality + 1);
+      if (!pinnedQuality && now - this.startedAt > 3000 && w.fps < 45 && this.quality < 2) this.setQuality(this.quality + 1);
       if (debug) {
         const info = this.sky.renderer.info.render;
         debugBox.hidden = false;
@@ -361,10 +363,11 @@ class App {
     }
   }
 
-  /** Step 1: no bloom. Step 2 (own page only): one pixel per CSS pixel. */
+  /** Step 1: no bloom. Step 2: no pulses and (own page only) one pixel per CSS pixel. */
   private setQuality(level: number) {
     this.quality = level;
     this.sky.setBloom(level < 1);
+    this.sky.setPulsesOn(level < 2 && !reducedMotion);
     if (level >= 2 && this.ownLoop) this.sky.renderer.setPixelRatio(1);
     this.resize();
   }
@@ -393,7 +396,7 @@ class App {
   private frameWholeSky() {
     const { camera, controls } = this.sky;
     const free = this.freeArea(), h = canvas.clientHeight || 1;
-    const radius = 70; // stars reach ±60, plus the gas around them
+    const radius = 70; // stars reach ±60, plus a margin for their glow
     const vfov = THREE.MathUtils.degToRad(camera.fov) / 2;
     const fh = (free.bottom - free.top) / h, fw = (free.right - free.left) / h;
     const half = Math.min(Math.atan(Math.tan(vfov) * fh), Math.atan(Math.tan(vfov) * fw));
@@ -458,9 +461,37 @@ class App {
       sky.alpha[i] = a;
     }
     sky.commitAlpha();
-    sky.setGas((t) => !this.hidden.has(t), this.focus >= 0);
-    if (this.focus >= 0) sky.setHighlight(this.focus, this.mainLinks(this.focus));
-    else sky.setHighlight(-1, []);
+    this.applyLinks();
+    // the pulses run out of the chosen star along its links, or over the whole (visible) network
+    const ends = sky.linkEnds, list: number[] = [];
+    for (let e = 0; e < ends.length / 2; e++) {
+      const a = ends[e * 2], b = ends[e * 2 + 1];
+      if (this.focus >= 0 ? a === this.focus || b === this.focus : this.hidden.size > 0 && !this.hidden.has(g.themes[a]) && !this.hidden.has(g.themes[b]) && g.kinds[a] === 1 && g.kinds[b] === 1) list.push(e);
+    }
+    sky.setPulses(list, this.focus);
+  }
+
+  /**
+   * The links, as in Obsidian: all of them at rest; the chosen (or hovered) star's lit up, wider and
+   * brighter, and the rest dimmed. Hidden themes take their links with them.
+   */
+  private linkVis = new Float32Array(0);
+  private applyLinks() {
+    const { g, sky } = this, ends = sky.linkEnds, m = ends.length / 2;
+    if (this.linkVis.length !== m) this.linkVis = new Float32Array(m);
+    const lit = this.focus >= 0 ? this.focus : this.hover;
+    // a book has hundreds of links: its main ideas' are the bright ones, the rest only a little
+    const main = new Set(this.focus >= 0 && g.kinds[this.focus] === 0 ? this.mainLinks(this.focus) : []);
+    for (let e = 0; e < m; e++) {
+      const a = ends[e * 2], b = ends[e * 2 + 1];
+      let v = this.hidden.has(g.themes[a]) || this.hidden.has(g.themes[b]) ? 0 : Math.min(sky.alpha[a], sky.alpha[b], 1);
+      if (v > 0 && lit >= 0) {
+        if (a === lit || b === lit) v = main.size && !main.has(a === lit ? b : a) ? 1.04 : 2;
+        else v = this.focus >= 0 ? 0.1 : 0.4;
+      }
+      this.linkVis[e] = v;
+    }
+    sky.setLinks(this.linkVis);
   }
 
   // ---------------------------------------------------------------- camera
@@ -550,6 +581,7 @@ class App {
     }
     if (best !== this.hover) {
       this.hover = best;
+      if (this.focus < 0) this.applyLinks();
       canvas.style.cursor = best >= 0 ? 'pointer' : '';
       if (best >= 0) window.setTimeout(() => this.hover === best && prefetchNote(this.g.slugs[best]), 150);
     }
@@ -778,7 +810,7 @@ class App {
     let stats: [string, string][], byline: string, sections = '';
     if (isBook) {
       const related = this.relatedBooks(i);
-      stats = [[fmt.format(concepts.length), 'ideas'], [fmt.format(related.length), related.length === 1 ? 'libro enlazado' : 'libros enlazados'], [fmt.format(concepts.filter((j) => DATED.test(g.titles[j])).length), 'fechas']];
+      stats = [[fmt.format(concepts.length), 'ideas'], [fmt.format(related.length), related.length === 1 ? 'libro afín' : 'libros afines'], [fmt.format(concepts.filter((j) => DATED.test(g.titles[j])).length), 'fechas']];
       byline = [info?.author ?? g.titles[i].split(' - ')[0], info?.year].filter(Boolean).join(' · ');
       sections += `<section><h3>Ideas principales</h3><div class="ideas">${concepts.slice(0, 8).map((j) => `<a href="/biblioteca/${g.slugs[j]}" data-star="${j}">${esc(this.shortTitle(j))}</a>`).join('')}</div></section>`;
       if (related.length) sections += `<section><h3>Conectado con <span>${related.length}</span></h3><ul class="links">${related.slice(0, 6).map(([j, n]) => link(j, `${g.bookInfo.get(j)?.author ?? ''} · ${n} ${n === 1 ? 'idea' : 'ideas'} en común`)).join('')}</ul></section>`;

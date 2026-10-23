@@ -1,6 +1,7 @@
-# La nebulosa (la biblioteca en 3D)
+# La red de ideas (la biblioteca en 3D)
 
-Cada nota publicada es una estrella y cada temática una galaxia de gas de color. Se ve dentro de la isla, al
+Cada nota publicada es una estrella y cada idea compartida, una línea de luz: una red al estilo del grafo de
+Obsidian, con el color de cada temática. Se ve dentro de la isla, al
 subir al observatorio (`#observatorio`), y en `/constelacion` como respaldo. Código en `src/constellation/`;
 interfaz en `src/components/ConstellationUI.astro`.
 
@@ -19,6 +20,8 @@ Elegido por Héctor entre dos propuestas («Cristal» y «Panel»): **Panel, que
   libros conectados con cuántas ideas comparten; el resumen y la lista completa.
 - **Plegado («Cristal»):** el panel queda en su barra de arriba (marca y buscador) y el cielo ocupa toda la
   pantalla, con los filtros de temas y el zoom flotando en paneles de cristal.
+- **De nebulosa a red (oct 2026):** Héctor vio que el gas lo emborronaba todo y no dejaba ver qué se une con
+  qué. Se quitó el gas y volvieron las líneas, ahora todas, con color y luz. El panel no cambió.
 - **La vista sigue al panel:** el centro de la cámara se desplaza (`setViewOffset`) para que el cielo quede en
   la parte libre de la pantalla, y se desliza al plegar o abrir el panel.
 
@@ -32,10 +35,18 @@ Elegido por Héctor entre dos propuestas («Cristal» y «Panel»): **Panel, que
   temática pasó de 24,9 a 7,2 unidades, y los centros de las temáticas de estar a 7,6 a estar a 42,7.
 - **Estrellas** (`style.ts`, compartido con el cielo de la isla para que el paso sea continuo): los libros son
   las más grandes y blancas; «Otros» se dibuja como un anillo para no depender solo del color.
-- **Gas:** unas 500 nubes (una por cada seis notas, en su posición), cuadrados que miran a la cámara en un solo
-  dibujo instanciado, con una textura de nube y el color de su temática.
-- **Bloom** (`UnrealBloomPass`): hace brillar las estrellas más claras y el gas más denso.
-- **Líneas:** solo del libro elegido a sus 10 ideas más compartidas (antes, cientos de líneas a la vez).
+- **Líneas:** los 13.274 enlaces, en un solo dibujo instanciado de rectángulos en pantalla (así tienen grosor
+  real y bordes suaves, cosa que `LineBasicMaterial` no da en WebGL). Cada una lleva el degradado entre los
+  colores de sus dos notas; si une dos temáticas distintas, tira hacia un blanco cálido.
+  - En reposo: las de libro a idea, muy tenues (0,06); entre ideas, 0,14; entre temáticas, 0,22.
+  - Al pasar el ratón por una estrella se encienden las suyas.
+  - Al elegir una: sus líneas se encienden y el resto baja casi a cero. De un libro, solo sus 10 ideas
+    principales van a plena luz; las demás quedan a media luz para que no sea un «erizo» de 546 rayos.
+- **Pulsos:** 700 puntos de luz que viajan por las líneas, un solo dibujo, movidos en el shader. En reposo
+  recorren enlaces entre ideas; al elegir una estrella salen de ella hacia sus vecinas. Con movimiento reducido no
+  hay pulsos.
+- **Bloom** (`UnrealBloomPass`): solo para estrellas y pulsos. Las líneas se dibujan después, nítidas: con miles
+  de líneas superpuestas, el bloom quemaba el centro en blanco (comprobado en captura).
 - **Etiquetas**, como en Embedding Atlas de Apple: fuente del sistema, pequeñas, con un halo oscuro.
   - De lejos: cada temática como una pastilla con su número de libros, y los libros más grandes.
   - Más cerca: los libros y luego las ideas del centro de la vista.
@@ -53,21 +64,24 @@ Elegido por Héctor entre dos propuestas («Cristal» y «Panel»): **Panel, que
 | [anvaka/pm](https://github.com/anvaka/pm) | Galaxias por color y el buscador como forma principal de moverse | MIT |
 | nomic-ai/deepscatter | Descartado: CC BY-NC-SA (no comercial) | — |
 
-No se ha copiado código de ninguno: la nebulosa es propia sobre three.js.
+No se ha copiado código de ninguno: la red es propia sobre three.js. Las líneas con luz se inspiran en la vista
+de grafo de Obsidian (solo la idea; Obsidian no es de código abierto).
 
 ## Decisiones medidas
 
 | Decisión | Por qué |
 |---|---|
 | `WebGLRenderer` en vez de `WebGPURenderer` | Con la misma escena en Chromium por software, WebGPURenderer (en su modo WebGL 2) iba a 1–3 fps y WebGLRenderer a 5–60 fps según la escena. Además three.js r186 envía `swizzle` en `createView`, que Chromium < 143 rechaza. |
-| Sin la maraña de enlaces | Las 13.274 líneas entre notas eran lo que más costaba dibujar y lo que hacía ilegible el cielo. Ahora solo hay 10 líneas, las del libro elegido. |
-| Calidad adaptativa | Si tras 3 s el dispositivo va a menos de 45 fps, primero se quita el bloom y después, en la página propia, la resolución baja a 1×. |
+| Las 13.274 líneas en un solo dibujo | La primera constelación las dibujaba como `LineSegments` de 1 px: una maraña gris. Ahora son rectángulos instanciados con grosor, color y transparencia por enlace, que bajan casi a cero fuera de la estrella elegida. |
+| Líneas fuera del bloom | Con bloom sobre las líneas, la vista general quedaba blanca en el centro. |
+| Calidad adaptativa | Si tras 3 s el dispositivo va a menos de 45 fps, primero se quita el bloom y después los pulsos (y, en la página propia, la resolución baja a 1×). `?calidad=alta` la fija. |
+| Draw calls (medido con `?debug`, oct 2026) | 18 con bloom (el bloom son varias pasadas) y 5 sin él. |
 
 ## Medido en dispositivos reales
 
 - Versión anterior, equipo de Héctor (DPR 1,5): 60 fps, calidad alta, 9 draw calls (oct 2026).
-- **Esta versión (gas y bloom): pendiente de medir.** Abre `/constelacion?debug` y mira la línea verde (fps,
-  calidad, draw calls). `?nobloom` la dibuja sin bloom, para comparar.
+- **Esta versión (red, pulsos y bloom): pendiente de medir.** Abre `/constelacion?debug` y mira la línea verde
+  (fps, calidad, draw calls). `?nobloom` y `?nopulse` quitan el bloom o los pulsos, para comparar.
 
 ## Lo que no se puede medir aquí
 
@@ -76,5 +90,5 @@ adaptativa siempre quita el bloom).
 
 ## Peso (gzip, oct 2026)
 
-Código de la nebulosa 20,6 KB (antes 13,8; el bloom y el panel), three.js 155 KB compartido con la isla,
+Código de la red 21,3 KB (la nebulosa, 20,6), three.js 155 KB compartido con la isla,
 `graph.json` 70 KB y `graph.bin` 50 KB (Brotli), Inter solo los subconjuntos que use la página.

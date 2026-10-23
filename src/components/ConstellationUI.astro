@@ -122,10 +122,10 @@ const icon = {
   {variant === 'page' && <>
     <p class="loading" role="status">Encendiendo {num(stars)} estrellas…</p>
     <div class="fallback">
-      <p>Tu navegador no puede mostrar la nebulosa en 3D.</p>
+      <p>Tu navegador no puede mostrar la biblioteca en 3D.</p>
       <a href="/biblioteca">Ver la biblioteca en lista</a>
     </div>
-    <noscript><div class="fallback show"><p>La nebulosa necesita JavaScript.</p><a href="/biblioteca">Ver la biblioteca en lista</a></div></noscript>
+    <noscript><div class="fallback show"><p>La biblioteca en 3D necesita JavaScript.</p><a href="/biblioteca">Ver la biblioteca en lista</a></div></noscript>
   </>}
   <p id="debug" class="debug" hidden></p>
 </Root>
@@ -264,7 +264,7 @@ const icon = {
   .detail :global(.stats div) { padding: 11px 12px; }
   .detail :global(.stats div + div) { border-left: 0.5px solid var(--s-sep); }
   .detail :global(.stats b) { display: block; font: 700 20px/1.15 var(--s-font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .detail :global(.stats span) { font: 500 12px/1.3 var(--s-font); color: var(--s-l2); }
+  .detail :global(.stats span) { font: 500 12px/1.3 var(--s-font); color: var(--s-l2); white-space: nowrap; }
   .detail :global(.actions) { display: flex; gap: 8px; }
   .detail :global(.actions > *) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 99px; font: 600 14px/1 var(--s-font); text-decoration: none; cursor: pointer; background: rgb(255 255 255 / 0.08); border: 0.5px solid var(--s-stroke); color: var(--s-l1); }
   .detail :global(.actions .primary) { flex: 1; background: #f5f5f7; color: #0b0b0f; border-color: transparent; }

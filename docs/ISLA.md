@@ -22,8 +22,8 @@ Código en `src/island/`:
 | `terrain.ts` | Forma de la isla, caminos, lugares, superficies, por dónde puede ir el toro. Sin three.js; con tests (`tests/island.test.ts`). |
 | `palette.ts` | Las dos luces (atardecer y noche) y la mezcla según la distancia al observatorio. |
 | `world.ts` | Cielo, terreno con arena mojada, mar con resaca, hierba, encinas, muros, flores, los cuatro lugares, molino, el alias en piedra y carteles. |
-| `ship.ts` | El barco pirata amarrado al muelle: casco curvo con troneras y cañones, castillo de popa con ventanas encendidas, tres palos con velas gastadas, foque, jarcia y bandera pirata que ondea; se mece con la marejada. |
-| `whale.ts` | Secreto: si el toro se queda quieto al final del muelle mirando al mar, la cámara baja a mirar el horizonte y sale una yubarta (dos soplidos, un salto de perfil girando sobre el lomo, el chapuzón y la cola al sumergirse). La primera vez siempre; luego una de cada dos esperas, nunca dos veces en un minuto. |
+| `ship.ts` | El barco pirata amarrado al muelle: casco curvo con troneras y cañones, castillo de popa con ventanas encendidas (el casco es lleno hasta la quilla, para que el castillo no parezca una caja flotando), tres palos con velas gastadas, foque, jarcia y bandera pirata que ondea; se mece con la marejada. |
+| `whale.ts` | Secreto: si el toro se queda quieto al final del muelle mirando al mar, la cámara mira por encima del toro al mar abierto y sale una yubarta a unos 40 m (lomo casi negro, vientre claro con pliegues, tubérculos en la cabeza, aletas pectorales largas; cabe entera en un móvil en vertical: dos soplidos, un salto de perfil girando sobre el lomo, el chapuzón y la cola al sumergirse). La primera vez siempre; luego una de cada dos esperas, nunca dos veces en un minuto. |
 | `bottles.ts` | Secreto: una botella con un destello en algún punto de la orilla. Al llegar el toro sale una nota con una idea de la biblioteca (de las que aparecen en tres libros o más, `public/data/bottles.json`, 211 ideas, generado por `scripts/library/build.ts`) y «Verla en el cielo» sube al observatorio con esa idea. Al rato aparece otra botella en otro sitio. |
 | `site.ts` | La obra del próximo proyecto: estructura de hormigón, andamio, dos grúas torre que giran con su carga, valla y cartel «Próximamente»; luces rojas que parpadean y foco de noche. |
 | `shaders.ts` | Trozos de shader compartidos: niebla, lo que tapa al toro se vuelve translúcido y copas que se mecen. Lo que se pisa (el muelle) y el barco van marcados como sólidos (`userData.solid`): antes, al pisar el muelle, el muelle entero «tapaba» al toro y desaparecía. |
@@ -31,13 +31,13 @@ Código en `src/island/`:
 | `locomotion.ts` | Los pasos del toro, generados cada fotograma: paso, trote, medio galope y galope, con las pezuñas clavadas donde pisan. |
 | `observatory.ts` | La subida del observatorio a la constelación y la vuelta, sin salir de la isla. |
 | `pavilion.ts` | La entrada en el edificio de WarrenIA: se abren las puertas, la cámara llega a la pantalla y la app se abre encima (`warrenia.ts`). |
-| `bolsa.ts` | El edificio de WarrenIA: escalinata, columnas estriadas, frontón con el logo en relieve dorado, teletipo salvia y puertas de bronce. |
+| `bolsa.ts` | El edificio de WarrenIA: escalinata, columnas estriadas, frontón con el logo en relieve dorado, teletipo salvia y puertas de bronce. Es opaco (`userData.solid`): el sombreado que deja ver al toro a través de lo que lo tapa no se aplica, así que desde la puerta no se ve la pantalla de dentro. |
 | `warrenia-screen.ts` | La pantalla de la pared: el Radar de la app dibujado con los datos y logos reales. |
 | `effects.ts` | Huellas que el mar borra y que de noche brillan, polvo de las pezuñas, polvo dorado y luciérnagas. |
 | `birds.ts` | Bandadas que se espantan, gaviotas y mariposas. |
 | `stars.ts` | El cielo nocturno es la biblioteca: una estrella por nota, con el color de su temática. |
 | `audio.ts` | Sonido sintetizado (Web Audio): olas, viento, chicharras, grillos, pezuñas según el suelo y música. |
-| `input.ts` | Teclado, ratón, joystick táctil y mando. |
+| `input.ts` | Teclado, ratón, joystick táctil y mando. El joystick (oct 2026, «muy sensible») tiene 144 px, zona muerta en el centro, curvas suaves para avanzar y girar (el giro llega al 85 %), galope solo en el último 18 % del recorrido y la salida suavizada mientras se arrastra. |
 | `app.ts` | Lo junta todo: cámara, día y noche, lugares, mapa, enlaces `#…`, calidad automática y la API de tests `window.__isla`. |
 
 WarrenIA es su propia app, compilada aparte en `/warrenia-app/` (ver `docs/WARRENIA.md`), y el cielo interactivo en

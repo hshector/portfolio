@@ -288,11 +288,11 @@ export async function startIsland({ root, places }: IslandOptions) {
     const back = 10 + Math.min(4, Math.abs(me.speed) * 0.5);
     want.set(me.x - Math.sin(me.heading) * back, by + 6, me.z - Math.cos(me.heading) * back);
     look.set(me.x, by + 1.4, me.z);
-    // standing still at the end of the jetty, looking out: the camera comes down and looks at the sea
+    // standing still at the end of the jetty, looking out: the camera looks over the bull at the sea far
+    // out, so the bull sits low in the picture and the water is in the middle
     if (gaze > 0) {
       const k = gaze * gaze * (3 - 2 * gaze);
-      want.y -= 2.6 * k;
-      look.lerp(tmpLook.set(me.x + Math.sin(me.heading) * 26, 2.2, me.z + Math.cos(me.heading) * 26), k);
+      look.lerp(tmpLook.set(me.x + Math.sin(me.heading) * 44, 0.9, me.z + Math.cos(me.heading) * 44), k);
     }
     // never under the ground, and never with a hill between the camera and the bull
     want.y = Math.max(want.y, height(want.x, want.z) + 2);
@@ -378,8 +378,9 @@ export async function startIsland({ root, places }: IslandOptions) {
 
   // ---------------------------------------------------------------- secrets: nothing announces them
   // a whale, for whoever stands still at the end of the jetty looking out to sea (whale.ts)
-  // (off to the right of the jetty's line, so the bull in the foreground never hides it)
-  const whale = createWhale(scene, new THREE.Vector3(JETTY.x - 11, 0, JETTY.z1 + 16), audio);
+  // (far enough out for the whole whale to fit a phone held upright; the camera rises to look over the
+  // bull, so it does not hide it)
+  const whale = createWhale(scene, new THREE.Vector3(JETTY.x - 1, 0, JETTY.z1 + 40), audio);
   // a bottle on the beach with an idea from the library inside (bottles.ts)
   const bottles = createBottles(scene, shoreSpots());
   const note = {

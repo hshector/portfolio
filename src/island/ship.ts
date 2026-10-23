@@ -26,8 +26,9 @@ function hullGeometry() {
     const u = i / NU, { half, keel, deck } = hullAt(u), z = (u - 0.5) * L;
     for (let j = 0; j <= NT; j++) {
       const t = j / NT, s = Math.sin(Math.PI * t);
-      const x = half * Math.cos(Math.PI * t) * (0.55 + 0.45 * Math.pow(1 - s, 0.35));
-      const y = deck - (deck + keel) * Math.pow(s, 0.75);
+      // (a full, round-bilged section, as on a galleon: wide down to the waterline, then curving to the keel)
+      const x = half * Math.cos(Math.PI * t) * (0.82 + 0.18 * Math.pow(1 - s, 0.5));
+      const y = deck - (deck + keel) * Math.pow(s, 1.6);
       pos.push(x, y, z);
       // height above the waterline decides the paint
       const c = y > deck - 0.35 ? plank : y > deck - 0.75 ? band : y > deck - 0.9 ? wale : dark;

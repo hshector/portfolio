@@ -49,7 +49,8 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
   // mouse: hold and drag on the island (up to go, sideways to turn, further for faster)
   // touch: a joystick appears where the thumb lands
   const drag = { id: -1, x0: 0, y0: 0, dx: 0, dy: 0, touch: false };
-  const R = 56; // joystick radius in CSS px
+  const R = 72; // joystick radius in CSS px (a bigger ring: finer control under the thumb)
+  const DEAD = 0.14; // the stick's centre does nothing, so a resting thumb does not steer
   canvas.addEventListener('pointerdown', (e) => {
     if (!enabled || drag.id !== -1) return;
     drag.id = e.pointerId; drag.x0 = e.clientX; drag.y0 = e.clientY; drag.dx = drag.dy = 0;
@@ -110,11 +111,13 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
       turn = k('a', 'arrowleft') - k('d', 'arrowright');
       run = keys.has('shift') ? 1 : 0;
       if (drag.id !== -1) {
-        // pushing the stick: the further, the faster; past three quarters it gallops
-        const m = Math.hypot(drag.dx, drag.dy);
-        forward = -drag.dy > -0.25 ? Math.max(0, Math.min(1, m * 1.6)) : -Math.min(1, m * 1.6);
-        turn = -drag.dx * 1.4;
-        run = Math.max(0, (m - 0.55) / 0.45);
+        // the stick: past a dead centre, speed grows gently with the push (walk most of the way, gallop
+        // only at the rim) and turning grows gently with the sideways part, so small thumb moves are small
+        const m = Math.hypot(drag.dx, drag.dy), push = Math.max(0, (m - DEAD) / (1 - DEAD));
+        const side = m > 0 ? drag.dx / m : 0, ahead = m > 0 ? -drag.dy / m : 0;
+        forward = ahead > -0.4 ? push ** 1.4 : -0.6 * push;
+        turn = -Math.sign(side) * Math.abs(side) ** 1.5 * push * 0.85;
+        run = Math.max(0, (push - 0.82) / 0.18);
       }
       const pad = pollPad();
       if (pad) {
@@ -124,9 +127,13 @@ export function createInput(canvas: HTMLCanvasElement, joystick: HTMLElement, ha
         run = Math.max(pad.trig, (m - 0.7) / 0.3);
         steer.device = 'gamepad';
       }
-      steer.forward = Math.max(-1, Math.min(1, forward));
-      steer.turn = Math.max(-1, Math.min(1, turn));
-      steer.run = Math.max(0, Math.min(1, run));
+      // (thumb and mouse are eased over a few frames, so a twitch does not jerk the bull)
+      const ease = drag.id !== -1 ? 0.18 : 1;
+      steer.forward += (Math.max(-1, Math.min(1, forward)) - steer.forward) * ease;
+      steer.turn += (Math.max(-1, Math.min(1, turn)) - steer.turn) * ease;
+      steer.run += (Math.max(0, Math.min(1, run)) - steer.run) * ease;
+      if (Math.abs(steer.forward) < 0.005) steer.forward = 0;
+      if (Math.abs(steer.turn) < 0.005) steer.turn = 0;
       return steer;
     },
     active() { return steer.forward !== 0 || steer.turn !== 0; },

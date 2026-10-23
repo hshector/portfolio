@@ -5,36 +5,54 @@
 // points): no model to license.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const LEN = 11; // (before scaling: see whaleMesh)
 
 function whaleMesh() {
   const g = new THREE.Group();
-  const dark = new THREE.Color(0x3a4650), belly = new THREE.Color(0xd9dee2);
-  // the body: a lathe along its length (y), then laid along z with the head forward
+  const dark = new THREE.Color(0x1f262d), belly = new THREE.Color(0xeef1f2), pleat = new THREE.Color(0x9aa3a9);
+  // the body: a lathe along its length (y), then laid along z with the head forward. A humpback's
+  // shape: a broad rounded head, the bulk just behind the flippers, a long slim tail stock
   const pts: THREE.Vector2[] = [];
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24;
-    const r = 1.35 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.15) ** 0.62), 0.9) * (1 - 0.72 * t ** 2) + 0.06;
+  const S = THREE.MathUtils.smoothstep;
+  for (let i = 0; i <= 32; i++) {
+    const t = i / 32;
+    const r = 1.4 * Math.sqrt(S(t, 0, 0.3)) * (1 - 0.86 * S(t, 0.38, 0.95)) + 0.06;
     pts.push(new THREE.Vector2(r, t * LEN));
   }
-  const body = new THREE.LatheGeometry(pts, 24);
+  const body = new THREE.LatheGeometry(pts, 32);
   body.scale(1, 1, 0.82); // a little flatter than round
   body.rotateX(-Math.PI / 2).translate(0, 0, LEN * 0.42); // head at +z
   const pos = body.attributes.position as THREE.BufferAttribute, col: number[] = [];
   for (let i = 0; i < pos.count; i++) {
-    const c = dark.clone().lerp(belly, THREE.MathUtils.smoothstep(-pos.getY(i), 0.2, 1.0));
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const c = dark.clone().lerp(belly, S(-y, 0.15, 0.9));
+    // the throat's long pleats, under the front half
+    if (z > -0.5 && y < -0.3) c.lerp(pleat, 0.45 * (0.5 + 0.5 * Math.cos(x * 16)) * S(z, -0.5, 1.5));
     col.push(c.r, c.g, c.b);
   }
   body.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   body.computeVertexNormals();
   const skin = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.05 });
   g.add(new THREE.Mesh(body, skin));
+  // the knobs (tubercles) along the top of the head
+  const knob = new THREE.MeshStandardMaterial({ color: 0x1a2026, roughness: 0.6 });
+  const knobs: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 12; k++) {
+    const z = LEN * 0.42 - 0.45 - (k >> 1) * 0.3, side = k % 2 ? 1 : -1, t = (LEN * 0.42 - z) / LEN;
+    const r = 1.4 * Math.sqrt(S(t, 0, 0.3)) + 0.06, x = side * r * 0.3;
+    // (half sunk in the skin: on the surface of the flattened section, a little lower)
+    const y = 0.82 * Math.sqrt(r * r - x * x) - 0.02;
+    knobs.push(new THREE.SphereGeometry(0.06, 6, 4).translate(x, y, z));
+  }
+  g.add(new THREE.Mesh(mergeGeometries(knobs), knob));
   // the long pectoral fins, pale underneath like a humpback's
-  const finMat = new THREE.MeshStandardMaterial({ color: 0x9aa4ab, roughness: 0.5 });
+  // (a grey that stays grey in the evening light: a pure white turns into a tan blade against the sky)
+  const finMat = new THREE.MeshStandardMaterial({ color: 0x8a949b, roughness: 0.55 });
   for (const s of [-1, 1]) {
     // long, thin and tapered: a flattened ellipsoid from the shoulder out
-    const fin = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8).scale(1.8, 0.07, 0.42).translate(1.7 * s, 0, 0), finMat);
+    const fin = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8).scale(1.6, 0.08, 0.4).translate(1.5 * s, 0, 0), finMat);
     fin.position.set(s * 1.0, -0.55, LEN * 0.22);
     fin.rotation.set(0, s * 0.55, s * -0.35);
     g.add(fin);
@@ -76,7 +94,7 @@ function spray(n: number) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   // (big, soft droplets: at 20 m small ones vanish against the bright evening sky)
-  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xeef3f6, map: dropTexture(), size: 1.1, transparent: true, opacity: 0.95, depthWrite: false }));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xeef3f6, map: dropTexture(), size: 1.6, transparent: true, opacity: 0.95, depthWrite: false }));
   pts.frustumCulled = false;
   let next = 0;
   return {
@@ -139,17 +157,17 @@ export function createWhale(scene: THREE.Scene, at: THREE.Vector3, sound?: { blo
       t += dt;
       // two blows at the surface, the back just showing as it swims
       if (t < 5) {
-        along(-8 + t * 0.8, -0.95 + 0.25 * Math.sin(t * 1.3));
+        along(-3 + t * 0.4, -0.95 + 0.25 * Math.sin(t * 1.3));
         whale.rotation.set(0, YAW, 0);
-        const [bx, bz] = head(-8 + t * 0.8 + LEN * 0.35);
-        if (t > 0.6) once('blow1', () => { drops.burst(140, bx, 0.9, bz, 8, 0.9, 1.7); sound?.blow(); });
-        if (t > 3.2) once('blow2', () => { drops.burst(140, bx, 0.9, bz, 8, 0.9, 1.7); sound?.blow(); });
+        const [bx, bz] = head(-3 + t * 0.4 + LEN * 0.35);
+        if (t > 0.6) once('blow1', () => { drops.burst(200, bx, 0.9, bz, 8, 0.9, 1.7); sound?.blow(); });
+        if (t > 3.2) once('blow2', () => { drops.burst(200, bx, 0.9, bz, 8, 0.9, 1.7); sound?.blow(); });
         return;
       }
       // the breach: out of the water nose first, fins out, rolling onto its back, and down with a crash
       if (t < 8.2) {
         const k = (t - 5) / 3.2;
-        along(-2 + 6 * k, -6 + 14 * k - 12 * k * k);
+        along(-2 + 6 * k, -8 + 28 * k - 22 * k * k); // (two thirds of it clear the water at the top)
         whale.rotation.set(-1.25 * (1 - k) + 0.3 * k, YAW, Math.PI * 0.85 * THREE.MathUtils.smoothstep(k, 0.15, 0.85));
         const [ox, oz] = head(-2);
         once('out', () => { drops.burst(180, ox, 0.3, oz, 7, 3.5, 2); sound?.splash(); });
@@ -161,7 +179,7 @@ export function createWhale(scene: THREE.Scene, at: THREE.Vector3, sound?: { blo
       // behind, so their underside shows, as in the photographs)
       if (t < 10.5) { whale.position.y = -14; return; }
       if (t < DUR) {
-        const k = (t - 10.5) / (DUR - 10.5), dx = at.x + 6, dz = at.z + 4;
+        const k = (t - 10.5) / (DUR - 10.5), dx = at.x + 1, dz = at.z + 2;
         whale.rotation.set(1.3, 0.12, 0);
         whale.position.set(dx, -11.5 + 4.4 * Math.sin(Math.PI * k), dz + 6);
         if (k > 0.85) once('dive', () => drops.burst(120, dx, 0.2, dz, 4, 1.5, 1.4));

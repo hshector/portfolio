@@ -251,6 +251,10 @@ export function buildBolsa(cx: number, cy: number, cz: number, mat: Mat) {
   ticker.position.set(5.065, 4.79, 0);
   group.add(ticker);
 
+  // never see-through (shaders.ts): the bull stands right in front of it at the door, and a faded
+  // facade would show the screen inside from outside
+  group.traverse((o) => { o.userData.solid = true; });
+
   let open = 0, target = 0;
   return {
     group,

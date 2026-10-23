@@ -14,7 +14,7 @@ const { report } = library();
 const notes = report.books + report.concepts;
 // what each place says when the bull reaches its door (src/island/app.ts)
 const places = {
-  muelle: { title: `La isla de ${author.name}`, text: 'Lleva al toro a los tres lugares de la isla, o abre el mapa para ir directo.', action: 'Abrir el mapa' },
+  muelle: { title: `La isla de ${author.name}`, text: 'Lleva al toro a los tres lugares de la isla. El mapa te dice dónde está cada uno.', action: 'Abrir el mapa' },
   warrenia: { title: 'Pabellón WarrenIA', text: 'Sistema personal de inteligencia financiera: la app de verdad, con el análisis de anoche.', action: 'Entrar en WarrenIA', href: '/warrenia' },
   taller: { title: 'En obras · Próximamente', text: 'Aquí se está levantando el próximo proyecto. Todavía no se puede contar nada: vuelve pronto.', action: '' },
   observatorio: { title: 'Observatorio · La biblioteca', text: `${num(notes)} notas de ${num(report.books)} libros. Sube y recórrelas como una constelación.`, action: 'Subir al observatorio', href: '/constelacion' },
@@ -85,13 +85,7 @@ const places = {
 
     <dialog class="map" data-map aria-labelledby="map-title">
       <header><h2 id="map-title">Mapa de la isla</h2><form method="dialog"><button class="icon-btn" aria-label="Cerrar el mapa">✕</button></form></header>
-      <canvas data-map-canvas width="440" height="440" aria-hidden="true"></canvas>
-      <ul class="places">
-        <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button><a href="/warrenia" data-island-go="warrenia">o entrar ya</a></li>
-        <li><button type="button" data-go="taller">Ir a la obra (próximamente)</button></li>
-        <li><button type="button" data-go="observatorio">Ir al Observatorio</button><a href="/constelacion" data-island-go="observatorio">o subir ya</a></li>
-        <li><button type="button" data-go="muelle">Volver al muelle</button></li>
-      </ul>
+      <canvas data-map-canvas width="440" height="440" role="img" aria-label="Mapa de la isla: el muelle al sur, el edificio de WarrenIA al oeste, la obra al este y el observatorio al norte, con caminos que se cruzan en el centro."></canvas>
     </dialog>
     <noscript><div class="fallback show"><p>La isla en 3D necesita JavaScript.</p><a class="go" href="#proyectos">Ver los proyectos</a></div></noscript>
     <script type="application/json" data-places set:html={JSON.stringify(places)} />
@@ -243,11 +237,6 @@ const places = {
   .map header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .map h2 { font-size: 20px; }
   .map canvas { width: 100%; height: auto; aspect-ratio: 1; border-radius: 14px; display: block; }
-  .places { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
-  .places li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-  .places button { font: 600 14px/1 var(--f-body); color: var(--ink); background: rgb(255 255 255 / 0.08); border: 1px solid var(--line); border-radius: 99px; padding: 10px 14px; cursor: pointer; }
-  .places button:hover { background: rgb(255 255 255 / 0.14); }
-  .places a { font-size: 13.5px; color: var(--ink-2); }
 
   /* ---- the page under the island */
   .page main { max-width: 1040px; margin: 0 auto; padding-block: clamp(48px, 10vw, 120px) 64px; display: grid; gap: clamp(40px, 7vw, 80px); }

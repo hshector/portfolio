@@ -14,7 +14,6 @@ type Isla = {
   prints: number;
   scared: number;
   stars: number;
-  autopilot: number;
   sound: boolean;
   flocks: { x: number; z: number }[];
   visit: string;
@@ -56,10 +55,10 @@ test('the skip menu goes to each place inside the island, never to another page'
   for (const [name, href] of [['WarrenIA', '/warrenia'], ['La biblioteca (constelación)', '/constelacion'], ['En obras: próximamente', '#proyectos']]) {
     await expect(skip.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
   }
-  // the building site: the bull sets off along the paths
+  // the building site: the bull is put at its door
   await skip.getByRole('link', { name: 'En obras: próximamente', exact: true }).click();
   await expect(page).toHaveURL(/\/\?lite$/);
-  expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
+  await expect.poll(() => isla(page, (i) => i.here)).toBe('taller');
   await skip.locator('summary').click();
   await skip.getByRole('link', { name: 'WarrenIA', exact: true }).click();
   await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('open');
@@ -174,17 +173,20 @@ test('the observatory stands at night, under the stars of the library', async ({
   await expect(page.locator('[data-prompt-go]')).toHaveAttribute('href', '/constelacion');
 });
 
-test('the map sends the bull along the paths to a place', async ({ page }) => {
+test('the map is only a map: it shows the island and sends the bull nowhere', async ({ page }) => {
   await open(page);
   await isla(page, (i) => i.place(-4, 14, 0));
   await page.locator('[data-map-open]').click();
-  await expect(page.locator('dialog[data-map]')).toBeVisible();
-  await page.locator('[data-go="taller"]').click();
-  await expect(page.locator('dialog[data-map]')).toBeHidden();
-  const d = () => isla(page, (i) => Math.hypot(i.bull.x - 25.5, i.bull.z - 10.8));
-  const d0 = await d();
-  expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
-  await expect.poll(d, { timeout: 60_000 }).toBeLessThan(d0 - 2);
+  const map = page.locator('dialog[data-map]');
+  await expect(map).toBeVisible();
+  await expect(map.getByRole('img', { name: /Mapa de la isla/ })).toBeVisible();
+  await expect(map.getByRole('button')).toHaveCount(1); // (only "Cerrar el mapa")
+  // drawn at the screen's resolution, not stretched
+  const { w, css } = await map.locator('canvas').evaluate((c: HTMLCanvasElement) => ({ w: c.width, css: c.clientWidth }));
+  expect(w).toBeGreaterThanOrEqual(Math.round(css));
+  await page.keyboard.press('Escape');
+  await expect(map).toBeHidden();
+  expect(await isla(page, (i) => Math.hypot(i.bull.x + 4, i.bull.z - 14))).toBeLessThan(0.5);
 });
 
 test('the building site promises the next project and gives nothing away', async ({ page }) => {

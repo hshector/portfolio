@@ -19,7 +19,7 @@ Código en `src/island/`:
 
 | Fichero | Qué hace |
 |---|---|
-| `terrain.ts` | Forma de la isla, caminos, lugares, superficies, por dónde puede ir el toro y rutas del mapa. Sin three.js; con tests (`tests/island.test.ts`). |
+| `terrain.ts` | Forma de la isla, caminos, lugares, superficies, por dónde puede ir el toro. Sin three.js; con tests (`tests/island.test.ts`). |
 | `palette.ts` | Las dos luces (atardecer y noche) y la mezcla según la distancia al observatorio. |
 | `world.ts` | Cielo, terreno con arena mojada, mar con resaca, hierba, encinas, muros, flores, los cuatro lugares, molino, el alias en piedra y carteles. |
 | `ship.ts` | El barco pirata amarrado al muelle: casco curvo con troneras y cañones, castillo de popa con ventanas encendidas, tres palos con velas gastadas, foque, jarcia y bandera pirata que ondea; se mece con la marejada. |
@@ -152,7 +152,8 @@ La cámara también sube cuando hay una colina entre ella y el toro.
 - enlace directo a `#warrenia/<ruta>` (y el antiguo `#warrenia/cartera`) y el botón Atrás;
 - noche y estrellas en el observatorio;
 - subir a la constelación y volver;
-- ruta desde el mapa;
+- el mapa solo es un mapa (a nitidez de pantalla, sin botones de «ir a»: Héctor los quitó en oct 2026 porque el toro
+  caminando solo quedaba mal); «Saltar a… → En obras» deja al toro en la puerta de la obra;
 - pájaros que se espantan;
 - sonido apagado hasta que se pide;
 - movimiento reducido;

@@ -4,7 +4,7 @@ import { GAITS, gaitAt } from '../src/island/locomotion';
 import { createLightUniforms, nightAt } from '../src/island/palette';
 import { createShared } from '../src/island/shaders';
 import {
-  DOORS, JETTY, NAME_BLOCKS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
+  DOORS, JETTY, NAME_BLOCKS, SITES, groundAt, height, surfaceAt, walkable, type SiteId,
 } from '../src/island/terrain';
 
 const ids = Object.keys(SITES) as SiteId[];
@@ -47,30 +47,6 @@ describe('the island', () => {
     let last = -1;
     for (let z = 44; z >= -38; z -= 2) { const n = nightAt(0, z); expect(n).toBeGreaterThanOrEqual(last); last = n; }
   });
-});
-
-describe('routes from the map', () => {
-  // the jetty's top, near each door, and two spots in the fields
-  const starts = [[0, 41], [-24, 9], [26, 12], [0, -30], [10, 20], [-15, -5]];
-  for (const id of ids) {
-    it(`reach the ${id} door from anywhere, over walkable ground`, () => {
-      for (const [x, z] of starts) {
-        const r = routeTo(x, z, id);
-        const end = r[r.length - 1];
-        expect(end).toEqual(DOORS[id]);
-        // sample every metre of every leg, from the bull to the path and on to the door
-        let prev = { x, z };
-        for (const p of r) {
-          const n = Math.ceil(Math.hypot(p.x - prev.x, p.z - prev.z));
-          for (let i = 0; i <= n; i++) {
-            const t = i / Math.max(1, n);
-            expect(walkable(prev.x + (p.x - prev.x) * t, prev.z + (p.z - prev.z) * t)).toBe(true);
-          }
-          prev = p;
-        }
-      }
-    });
-  }
 });
 
 describe('the gait table', () => {

@@ -21,7 +21,7 @@ import { createVisit } from './observatory';
 import { createPavilion } from './pavilion';
 import { appPath, START } from './warrenia';
 import {
-  DOORS, JETTY, PATHS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
+  DOORS, JETTY, PATHS, SITES, groundAt, height, surfaceAt, walkable, type SiteId,
 } from './terrain';
 import { MAP_SPAN, buildWorld, type Quality } from './world';
 
@@ -84,7 +84,6 @@ export async function startIsland({ root, places }: IslandOptions) {
   const start = { x: 0, z: 41, heading: Math.PI };
   const me = { ...start, speed: 0, turnRate: 0 };
   let mode: 'follow' | 'aerial' = 'follow';
-  let autopilot: { x: number; z: number }[] = [];
   let night = 0, here: SiteId | null = null, moved = false, stars: Awaited<ReturnType<typeof createLibrarySky>> | null = null;
   let starsPromise: ReturnType<typeof createLibrarySky> | null = null;
   const obstacleGrid = new Map<string, { x: number; z: number; r: number }[]>();
@@ -139,7 +138,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     ui.sound.title = ui.sound.getAttribute('aria-label')!;
   });
   ui.promptGo.addEventListener('click', (e) => { e.preventDefault(); act(); });
-  // every link to a place (the "Saltar a…" menu, the map) goes there in the island;
+  // every link to a place (the "Saltar a…" menu) goes there in the island;
   // their hrefs are for the version without 3D
   root.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest<HTMLElement>('[data-island-go]');
@@ -150,16 +149,15 @@ export async function startIsland({ root, places }: IslandOptions) {
     const where = a.dataset.islandGo;
     if (where === 'warrenia') enterPavilion();
     else if (where === 'observatorio') goUp();
-    else if (where === 'obra') goTo('taller');
+    else if (where === 'obra') goToDoor('taller');
   });
-  ui.map.addEventListener('click', (e) => {
-    const go = (e.target as HTMLElement).closest<HTMLElement>('[data-go]');
-    if (go) { goTo(go.dataset.go as SiteId); ui.map.close(); }
-    else if (e.target === ui.map) ui.map.close(); // click on the backdrop
-  });
+  // the map is only a map: a click on the backdrop closes it
+  ui.map.addEventListener('click', (e) => { if (e.target === ui.map) ui.map.close(); });
 
-  function goTo(id: SiteId) {
-    autopilot = routeTo(me.x, me.z, id);
+  /** The bull straight to a place's door, facing the place. */
+  function goToDoor(id: SiteId) {
+    const d = DOORS[id], s = SITES[id];
+    placeBull(d.x, d.z, Math.atan2(s.x - d.x, s.z - d.z));
     setView('follow');
   }
 
@@ -238,16 +236,8 @@ export async function startIsland({ root, places }: IslandOptions) {
   const lookTarget = new THREE.Vector3();
   function moveBull(dt: number, now: number) {
     const st = input.poll();
-    if (input.active()) { autopilot = []; if (!moved) { moved = true; ui.hint.dataset.done = ''; } }
-    let forward = st.forward, turn = st.turn, run = st.run;
-    if (autopilot.length) {
-      // follow the route at a trot
-      const wp = autopilot[0];
-      const want = Math.atan2(wp.x - me.x, wp.z - me.z);
-      const diff = Math.atan2(Math.sin(want - me.heading), Math.cos(want - me.heading));
-      turn = THREE.MathUtils.clamp(diff * 2, -1, 1); forward = Math.abs(diff) > 1.2 ? 0.3 : 1; run = 0.45;
-      if (Math.hypot(wp.x - me.x, wp.z - me.z) < (autopilot.length > 1 ? 2.2 : 1.2)) autopilot.shift();
-    }
+    if (input.active() && !moved) { moved = true; ui.hint.dataset.done = ''; }
+    const forward = st.forward, turn = st.turn, run = st.run;
     const top = SPEED.walk + (SPEED.gallop - SPEED.walk) * run;
     const target = forward > 0 ? forward * top : forward * SPEED.walk * 0.6;
     me.speed += (target - me.speed) * Math.min(1, dt * (target > me.speed ? 1.6 : 3));
@@ -521,7 +511,6 @@ export async function startIsland({ root, places }: IslandOptions) {
 
   function placeBull(x: number, z: number, heading: number) {
     Object.assign(me, { x, z, heading, speed: 0, turnRate: 0 });
-    autopilot = [];
     bull.group.position.set(x, groundAt(x, z), z); bull.group.rotation.set(0, heading, 0); bull.reset(groundAt);
     cameraTarget(shared.time.value); camPos.copy(want); camLook.copy(look);
     camera.position.copy(camPos); camera.lookAt(camLook);
@@ -544,7 +533,6 @@ export async function startIsland({ root, places }: IslandOptions) {
     get scared() { return birds.scared; },
     get flocks() { return birds.perched(); },
     get stars() { return stars?.count ?? 0; },
-    get autopilot() { return autopilot.length; },
     get sound() { return audio.on; },
     place: placeBull,
     get visit() { return visit.state; },
@@ -555,7 +543,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     get demoPath() { return pav.demo?.path ?? null; },
     enterWarrenia: (path?: string) => enterPavilion(path),
     leaveWarrenia: leavePavilion,
-    goTo,
+    goToDoor,
     renderer, camera, scene, shared, bullAnim: bull, props: world.props,
   };
   requestAnimationFrame(frame);

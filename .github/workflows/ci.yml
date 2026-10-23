@@ -81,7 +81,9 @@ jobs:
             [ "$i" = 24 ] && { echo "::error::$SITE still serves an older build after 4 minutes"; exit 1; }
             sleep 10
           done
-          curl -fsS "$SITE/" | grep -q 'Héctor Sanchis' || { echo "::error::$SITE/ did not serve the home page"; exit 1; }
+          curl -fsS "$SITE/" | grep -q 'HSorollaP' || { echo "::error::$SITE/ did not serve the home page"; exit 1; }
+          # the author's name is never published, only the alias
+          ! curl -fsS "$SITE/" | grep -qiE 'Héctor|Sanchis[^p]|hshector' || { echo "::error::$SITE/ shows the author's name"; exit 1; }
           curl -fsS "$SITE/" | grep -q 'data-island' || { echo "::error::$SITE/ did not serve the island"; exit 1; }
           for path in /biblioteca /warrenia /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE$path")

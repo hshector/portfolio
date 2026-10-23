@@ -3,7 +3,7 @@
 La portada (`/`) es una isla en 3D que se recorre a lomos de un toro negro, y es toda la web: los
 dos proyectos se abren dentro de ella y nada lleva a otra página.
 
-- **WarrenIA** se abre en la pantalla del pabellón de cristal (`#warrenia`, `#warrenia/<pestaña>`).
+- **WarrenIA** se abre en la pantalla de su edificio, una pequeña bolsa moderna (`#warrenia`, `#warrenia/<ruta de la app>`).
 - **La biblioteca** es el cielo: desde el observatorio se sube a la constelación (`#observatorio`,
   `#observatorio/<nota>`).
 - **El próximo proyecto** es una obra con grúas donde estaba el taller (`site.ts`), con el cartel
@@ -27,7 +27,9 @@ Código en `src/island/`:
 | `bull.ts` | El toro: su postura de reposo, el pelaje, respiración, cola y cabeza que mira a los lugares. |
 | `locomotion.ts` | Los pasos del toro, generados cada fotograma: paso, trote, medio galope y galope, con las pezuñas clavadas donde pisan. |
 | `observatory.ts` | La subida del observatorio a la constelación y la vuelta, sin salir de la isla. |
-| `pavilion.ts` | La entrada en el pabellón: la cámara se acerca a la pantalla y la demo de WarrenIA se abre encima. |
+| `pavilion.ts` | La entrada en el edificio de WarrenIA: se abren las puertas, la cámara llega a la pantalla y la app se abre encima (`warrenia.ts`). |
+| `bolsa.ts` | El edificio de WarrenIA: escalinata, columnas estriadas, frontón con el logo en relieve dorado, teletipo salvia y puertas de bronce. |
+| `warrenia-screen.ts` | La pantalla de la pared: el Radar de la app dibujado con los datos y logos reales. |
 | `effects.ts` | Huellas que el mar borra y que de noche brillan, polvo de las pezuñas, polvo dorado y luciérnagas. |
 | `birds.ts` | Bandadas que se espantan, gaviotas y mariposas. |
 | `stars.ts` | El cielo nocturno es la biblioteca: una estrella por nota, con el color de su temática. |
@@ -35,7 +37,7 @@ Código en `src/island/`:
 | `input.ts` | Teclado, ratón, joystick táctil y mando. |
 | `app.ts` | Lo junta todo: cámara, día y noche, lugares, mapa, enlaces `#…`, calidad automática y la API de tests `window.__isla`. |
 
-La demo de WarrenIA está en `src/warrenia-demo/` (ver más abajo) y el cielo interactivo en
+WarrenIA es su propia app, compilada aparte en `/warrenia-app/` (ver `docs/WARRENIA.md`), y el cielo interactivo en
 `src/constellation/`, que se monta sobre el mismo lienzo y el mismo renderer que la isla.
 
 ## Decisiones
@@ -77,18 +79,18 @@ La demo de WarrenIA está en `src/warrenia-demo/` (ver más abajo) y el cielo in
   Al llegar, las líneas, los pulsos y el bloom de la red se encienden en 1,2 s, y el panel entra después
   (el cielo empieza a pantalla completa para que el paso no salte) mientras la vista se aparta para dejarle
   sitio.
-- **El pabellón de WarrenIA** (`pavilion.ts`): en su pared del fondo hay una pantalla de 5,4 × 3,2 m
-  con la portada de la app dibujada desde los datos de la demo (`src/warrenia-demo/screen.ts`). La
-  cámara se para delante, a la distancia en que la pantalla llena la vista, y la demo real se abre
-  justo encima. En el móvil ocupa toda la pantalla y la isla deja de dibujarse mientras tanto.
-- **La demo de WarrenIA** (`src/warrenia-demo/`) es la versión verde salvia (d0f5a4b), en español:
-  - El código que calcula es el de WarrenIA, copiado en `vendor/warrenia/` con sus tests (que se
-    ejecutan con los nuestros) por `scripts/warrenia/vendor.sh`.
-  - Los datos son inventados: un inversor ficticio que aporta 450 € al mes desde octubre de 2023 a
-    tres fondos genéricos («Indexado mundial», «Oro físico», «Momentum mundial») con precios
-    simulados con semilla fija, y 36 «Empresa Demo» en el radar. Ningún nombre ni logo real.
-  - La banda «Datos ficticios de demostración… No es asesoramiento financiero» está siempre a la
-    vista, y la proyección dice «Un rango, no una promesa».
+- **El edificio de WarrenIA** (`bolsa.ts`, oct 2026, pedido por Héctor: «como el Palacio de la Bolsa, moderno,
+  con el logo esculpido, no muy grande»): 11,2 × 8,4 m y 6,9 m de alto, casi lo mismo que el pabellón de
+  cristal al que sustituye. Travertino con textura propia (poros, vetas y juntas a escala real en cada cara),
+  cuatro columnas estriadas con basa y capitel de latón, cornisa con dentículos, frontón con el logo de
+  WarrenIA (la doble U de `brand.tsx`) en relieve dorado y sus dos cuadrados en salvia, un teletipo salvia
+  en el arquitrabe y rendijas de luz entre pilastras. Desde fuera no se ve nada de dentro: la fachada es de
+  piedra con dos puertas de bronce que se abren al entrar y se cierran al volver a la isla.
+- **Dentro**, en la pared del fondo, una pantalla de 5,4 × 3,2 m con el Radar de la app dibujado con los datos
+  y logos del extracto (`warrenia-screen.ts`). La cámara se para delante, a la distancia en que la pantalla
+  llena la vista, y la app se abre justo encima, en un marco con «← Volver al toro». En el móvil ocupa toda la
+  pantalla y la isla deja de dibujarse mientras tanto. La ruta de la app se refleja en la dirección
+  (`#warrenia/research/AAPL`); el botón Atrás retrocede primero dentro de la app y después sale.
 - **El alias (HSorollaP)** son letras de piedra extruidas de Bricolage Grotesque ExtraBold (SIL OFL 1.1). Los
   contornos se extraen con `scripts/assets/name.ts` (opentype.js, MIT) a `name-glyphs.json`, de 8 KB.
 - **Sonido sin ficheros:** todo se sintetiza en el navegador. No hay nada que licenciar ni que
@@ -115,7 +117,8 @@ La cámara también sube cuando hay una colina entre ella y el toro.
 |---|---|---|
 | three.js | 154 KB | Compartido con la constelación |
 | Código de la isla | 54 KB | |
-| Demo de WarrenIA | 20 KB | Solo al acercarse al pabellón |
+| App de WarrenIA (`/warrenia-app/`) | 76 KB de entrada + 10 KB de CSS; las pantallas se cargan al abrirlas (221 KB todo el JS) | Solo al entrar en el edificio |
+| Radar de WarrenIA (`radar.json`, 2.371 filas) | 404 KB con gzip | Al acercarse al edificio (la pantalla de la pared); la app lo reutiliza |
 | Cielo interactivo | 14 KB | Solo al anochecer o al subir |
 | Toro | 114 KB | |
 | Fuentes | 116 KB | woff2 |
@@ -144,8 +147,8 @@ La cámara también sube cuando hay una colina entre ella y el toro.
 - el menú «Saltar a…», que lleva a cada lugar sin salir de la isla;
 - andar y galopar con el teclado, dejando huellas;
 - joystick táctil;
-- entrar en el pabellón, cambiar de pestaña en la demo y volver al toro;
-- enlace directo a `#warrenia/<pestaña>` y el botón Atrás;
+- entrar en el edificio, navegar en la app (la dirección la sigue) y volver al toro;
+- enlace directo a `#warrenia/<ruta>` (y el antiguo `#warrenia/cartera`) y el botón Atrás;
 - noche y estrellas en el observatorio;
 - subir a la constelación y volver;
 - ruta desde el mapa;

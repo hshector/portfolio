@@ -10,7 +10,7 @@ export const warrenia = {
   summary:
     'Sistema personal de inteligencia financiera: qué comprar cada mes con la fiscalidad española, avisos cuando cambia una señal, un radar de momentum explicable y una cartera con FIFO, TWR y TIR.',
   stack: ['Next.js 16', 'Python', 'Supabase', 'GitHub Actions'],
-  facts: ['259 tests', '0 € al mes'],
+  facts: ['Análisis real cada noche', '0 € al mes'],
 };
 
 export const library = {

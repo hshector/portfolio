@@ -136,7 +136,7 @@ export function surfaceAt(x: number, z: number): Surface {
 // ------------------------------------------------------------------ where the bull may go
 /** Buildings the bull walks around (centre and radius). */
 export const BLOCKERS = [
-  { x: SITES.warrenia.x, z: SITES.warrenia.z, r: 5.6 },
+  { x: SITES.warrenia.x, z: SITES.warrenia.z, r: 6.2 },
   { x: SITES.taller.x, z: SITES.taller.z, r: 4 },
   { x: SITES.observatorio.x, z: SITES.observatorio.z, r: 4.5 },
 ];

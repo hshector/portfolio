@@ -19,7 +19,7 @@ type Isla = {
   flocks: { x: number; z: number }[];
   visit: string;
   pavilion: string;
-  demoTab: string | null;
+  demoPath: string | null;
   place(x: number, z: number, heading: number): void;
 };
 const isla = <T, A = unknown>(page: Page, fn: (i: Isla, a: A) => T, arg?: A) =>
@@ -106,7 +106,8 @@ test('WarrenIA opens on the screen of the pavilion, and the bull waits outside',
   const demo = page.locator('[data-warrenia]');
   await expect(demo).toBeVisible();
   await expect(page).toHaveURL(/#warrenia$/);
-  await expect(demo.getByRole('note')).toContainText('Datos ficticios');
+  const app = page.frameLocator('[data-warrenia] iframe');
+  await expect(app.getByRole('navigation', { name: 'Main' }).first()).toBeAttached();
   // on a desktop the panel lies over the screen in the pavilion; on a phone it fills the screen
   // (once its 0.45 s zoom-in has finished)
   const island = (await page.locator('[data-island]').boundingBox())!;
@@ -116,10 +117,15 @@ test('WarrenIA opens on the screen of the pavilion, and the bull waits outside',
     await expect.poll(width, { timeout: 10_000 }).toBeGreaterThan(island.width * 0.6);
     expect(await width()).toBeLessThan(island.width);
   }
-  await demo.getByRole('tab', { name: 'Radar' }).click();
-  await expect(page).toHaveURL(/#warrenia\/radar$/);
-  await expect(demo.locator('.w-list li').first()).toContainText('Empresa Demo');
-  // the browser's Back leaves the pavilion, and the bull is still at its door
+  // it opens on the radar, as on the wall; the app's own navigation is mirrored in the island's address
+  await expect(app.locator('a[href^="#/research/"]').first()).toBeVisible({ timeout: 20_000 });
+  await app.getByRole('link', { name: 'Plan' }).last().click();
+  await expect(page).toHaveURL(/#warrenia\/plan$/);
+  // the browser's Back goes back inside the app first (Plan → Radar), then leaves the pavilion,
+  // and the bull is still at its door
+  await page.goBack();
+  await expect(page).toHaveURL(/#warrenia$/);
+  expect(await isla(page, (i) => i.pavilion)).toBe('open');
   await page.goBack();
   await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('island');
   await expect(page).toHaveURL(/\/\?lite$/);
@@ -127,10 +133,12 @@ test('WarrenIA opens on the screen of the pavilion, and the bull waits outside',
   expect(errors).toEqual([]);
 });
 
-test('a link to #warrenia/<tab> opens that tab in the pavilion', async ({ page }) => {
+test('a link to #warrenia/<route> opens that screen of the app in the pavilion', async ({ page }) => {
+  // (#warrenia/cartera is the old demo's address for the portfolio: it still works)
   await open(page, '/?lite#warrenia/cartera');
   await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('open');
-  expect(await isla(page, (i) => i.demoTab)).toBe('cartera');
+  await expect.poll(() => isla(page, (i) => i.demoPath)).toBe('/portfolio');
+  await expect(page.frameLocator('[data-warrenia] iframe').getByRole('heading', { level: 1, name: 'Portfolio' })).toBeVisible();
   await page.locator('[data-warrenia]').getByRole('button', { name: '← Volver al toro' }).click();
   await expect.poll(() => isla(page, (i) => i.pavilion), { timeout: 60_000 }).toBe('island');
   await expect(page).toHaveURL(/\/\?lite$/);

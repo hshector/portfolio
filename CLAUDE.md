@@ -54,12 +54,16 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
   (sin WebGL o con movimiento reducido). Decisiones, mediciones y créditos en `docs/ISLA.md`.
 - Pasos del toro: procedurales (`src/island/locomotion.ts`, tabla de pasos e IK); del clip solo se usa el reposo.
 - Observatorio (`observatory.ts`): sube a la constelación en el mismo lienzo. `#observatorio[/<nota>]`.
-- Pabellón (`pavilion.ts`): la demo de WarrenIA (`src/warrenia-demo/`, español, verde salvia, datos ficticios)
-  se abre sobre su pantalla. `#warrenia[/<pestaña>]`. Donde estaba el taller hay una obra
-  con grúas (`site.ts`), «Próximamente».
+- WarrenIA (`pavilion.ts`, edificio en `bolsa.ts`): su app real (`src/warrenia-app/`, `/warrenia-app/`, en
+  inglés como la app) se abre sobre la pantalla del edificio. `#warrenia[/<ruta>]`. Lee el extracto público
+  que publica cada noche su motor (sin precios: sus proveedores no permiten redistribuirlos); la cartera del
+  visitante se guarda solo en su navegador. Detalle y decisiones en `docs/WARRENIA.md`.
+- Donde estaba el taller hay una obra con grúas (`site.ts`), «Próximamente».
 - Del autor solo se publica el alias **HSorollaP** (`src/data/site.ts`): ni su nombre, ni GitHub, ni texto sobre él.
-- `vendor/warrenia/`: código de WarrenIA copiado con `scripts/warrenia/vendor.sh` (commit en su README); sus tests
-  corren con los nuestros. Para actualizar, vuelve a ejecutar el script con un checkout nuevo.
+- `vendor/warrenia/web/`: la web de WarrenIA copiada sin tocar con `scripts/warrenia/vendor.sh` (commit en su README),
+  más `scripts/warrenia/demo.patch` (dónde había precios, logos, fuente de precio por defecto). Lo que solo existe
+  en un servidor lo sustituye `src/warrenia-app/shims` al compilar. Sus tests de `lib` corren con los nuestros.
+  Para actualizar, vuelve a ejecutar el script con un checkout nuevo de `main`.
 - Toro: «bull walk cycle» de Lucy Greenhill (CC BY 4.0), en `assets-src/toro/`; `scripts/assets/toro.sh` genera
   `src/assets/island/toro.glb`. El crédito tiene que seguir en el pie de la portada.
 - `?lite` (tests sin GPU), `?debug` (fps y calidad), `?calidad=alta|media|baja`. `window.__isla` es la API de los tests.
@@ -68,6 +72,8 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 ## Comandos
 
 - `npm run dev`: servidor de desarrollo (antes, `npm run library` con `VAULT_DIR` apuntando al vault).
+- `npm run warrenia:data` descarga el extracto de WarrenIA (o `WARRENIA_PUBLIC_DIR=<carpeta>` para uno local);
+  `npm run warrenia:build` compila la app en `public/warrenia-app/` (lo hace `npm run build`).
 - `npm run check` · `npm test` · `npm run build` · `npm run check:dist` · `npm run test:e2e`: lo que ejecuta el CI.
 - `npm run preview`: sirve `dist/` con wrangler, igual que Cloudflare en producción.
 - En un entorno con Chromium preinstalado: `PW_CHROMIUM_PATH=<ruta> npm run test:e2e`.

@@ -12,3 +12,5 @@ playwright-report/
 /.generated/
 /public/data/
 /vault/
+/public/warrenia-app/
+/.warrenia-public/

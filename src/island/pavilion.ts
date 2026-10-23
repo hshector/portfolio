@@ -1,10 +1,10 @@
 // Into the WarrenIA pavilion without leaving the island. The camera walks in through the glass and
 // stops square in front of the screen on the back wall, close enough for it to fill the view; then
-// the live demo (src/warrenia-demo) opens exactly over the screen's picture, and follows it if the
-// window changes size. On a phone the demo takes the whole screen. "Volver al toro" plays it back.
+// the app (src/island/warrenia.ts) opens exactly over the screen's picture, and follows it if the
+// window changes size. On a phone the app takes the whole screen. "Volver al toro" plays it back.
 
 import * as THREE from 'three';
-import type { Demo, Tab } from '../warrenia-demo/ui';
+import type { Demo } from './warrenia';
 
 export type PavilionState = 'island' | 'docking' | 'open' | 'leaving';
 
@@ -24,7 +24,7 @@ export interface PavilionHandles {
 }
 
 export function createPavilion(h: PavilionHandles) {
-  let state: PavilionState = 'island', t = 0, demo: Demo | null = null, tabOnArrival: Tab | undefined;
+  let state: PavilionState = 'island', t = 0, demo: Demo | null = null, pathOnArrival: string | undefined;
   const from = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
   const dock = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
   const tmp = new THREE.PerspectiveCamera(), corner = new THREE.Vector3();
@@ -59,8 +59,8 @@ export function createPavilion(h: PavilionHandles) {
     placePanel();
     h.host.hidden = false;
     requestAnimationFrame(() => h.host.setAttribute('data-open', ''));
-    if (tabOnArrival) demo!.show(tabOnArrival);
-    h.host.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+    if (pathOnArrival) demo!.show(pathOnArrival);
+    h.host.querySelector<HTMLElement>('[data-warrenia-close]')?.focus({ preventScroll: true });
   }
 
   addEventListener('resize', () => {
@@ -74,10 +74,10 @@ export function createPavilion(h: PavilionHandles) {
     get state() { return state; },
     get progress() { return t; },
     get demo() { return demo; },
-    /** Walk in. instant: straight to the open demo (a link to #warrenia). */
-    async go(tab?: Tab, instant = false) {
+    /** Walk in. instant: straight to the open app (a link to #warrenia[/route]). */
+    async go(path?: string, instant = false) {
       if (state !== 'island') return;
-      tabOnArrival = tab;
+      pathOnArrival = path;
       from.pos.copy(h.camera.position); from.quat.copy(h.camera.quaternion);
       dockPose();
       setState('docking');

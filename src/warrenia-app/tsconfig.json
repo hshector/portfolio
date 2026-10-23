@@ -1,0 +1,32 @@
+{
+  // Type-checks the demo with the same replacements as vite.warrenia.config.ts (npm run check).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/lib/market/source": ["./shims/source.ts"],
+      "@/lib/user/store": ["./shims/store.ts"],
+      "@/lib/supabase/*": ["./shims/supabase.ts"],
+      "@/app/login/actions": ["./shims/supabase.ts"],
+      "next/link": ["./shims/link.tsx"],
+      "next/navigation": ["./shims/navigation.ts"],
+      "next/cache": ["./shims/navigation.ts"],
+      "server-only": ["./shims/empty.ts"],
+      "web-push": ["./shims/web-push.ts"],
+      "@demo/*": ["./*"],
+      "@vendor/*": ["../../vendor/warrenia/web/*"],
+      "@/*": ["../../vendor/warrenia/web/*"]
+    }
+  },
+  "include": ["./**/*", "../../vendor/warrenia/web/**/*"],
+  "exclude": ["../../vendor/warrenia/web/**/*.test.ts", "../../vendor/warrenia/web/lib/supabase/**", "../../vendor/warrenia/web/lib/market/source.ts"]
+}

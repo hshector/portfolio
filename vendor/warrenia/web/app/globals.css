@@ -1,0 +1,414 @@
+/* demo: the classes are in this app and in the demo's own files */
+@import "tailwindcss" source("../");
+@source "../../../../src/warrenia-app";
+
+/* -------------------------------------------------------------- tokens
+   Light, calm, app-like (iOS / Revolut / Trade Republic). One accent colour:
+   sage green ("Salvia"), used for primary actions and one pastel hero surface per
+   screen. Secondary hues are dusty and desaturated; gains are a clearer green
+   than the accent, losses a muted brick red. */
+
+:root {
+  --canvas: #f3f4f1;
+  --surface: #ffffff;
+  --surface-2: #f3f4f1;
+  --surface-3: #e8eae5;
+  --line: rgb(17 17 17 / 0.07);
+  --line-2: rgb(17 17 17 / 0.12);
+  --ink: #111111;
+  --ink-2: #686b66;
+  --ink-3: #a0a39d;
+  --accent: #527f62;
+  --accent-2: #44705a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8f0ea;
+  --accent-line: rgb(82 127 98 / 0.3);
+  --canvas-2: #f3f4f1;
+  --pos: #2f8a57;
+  --pos-soft: #e8f2eb;
+  --neg: #b5564b;
+  --neg-soft: #f7ebe8;
+  --warn: #9c7a3c;
+  --warn-soft: #f5efe2;
+  --info: #5a6e94;
+  --info-soft: #edf0f6;
+  --shadow-card: 0 1px 2px rgb(17 17 17 / 0.04), 0 4px 16px rgb(17 17 17 / 0.04);
+  /* Secondary hues (allocation dots, chart series, state dots, avatars) and the
+     selected thumb of segmented controls. */
+  --gold: #c9a24a;
+  --violet: #7c6a98;
+  --violet-soft: #f1eef6;
+  --lilac: #a99bc4;
+  --sand: #c4a77a;
+  --thumb: #ffffff;
+  --overlay: rgb(0 0 0 / 0.25);
+  --av-1: #e7eee8;
+  --av-2: #e9edf3;
+  --av-3: #f2ede3;
+  --av-4: #efebf3;
+  --av-5: #ecefe6;
+  --av-6: #f3e9e6;
+  /* The pastel hero card (portfolio value). */
+  --hero-1: #cfe3d3;
+  --hero-2: #b5d3be;
+  --hero-3: #e6efe3;
+  --hero-4: #a9c9b5;
+  --hero-5: #c9dfcf;
+  --hero-6: #9cc2aa;
+  --hero-ink: #1f3a2b;
+  --hero-btn: rgb(255 255 255 / 0.93);
+  --hero-btn-ink: #44705a;
+  --hero-shadow: rgb(82 127 98 / 0.2);
+  color-scheme: light;
+}
+
+/* Dark: iOS-style. True black canvas (OLED), graphite cards, off-white text; a
+   lighter sage; gains / losses tuned to read on black. Set by next-themes as
+   `class="dark"` on <html> (Ajustes → Apariencia). */
+:root.dark {
+  --canvas: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --surface-3: #3a3a3c;
+  --line: rgb(255 255 255 / 0.08);
+  --line-2: rgb(255 255 255 / 0.15);
+  --ink: #f5f5f7;
+  --ink-2: #a1a1a6;
+  --ink-3: #6e6e73;
+  --accent: #8dbf9c;
+  --accent-2: #a8d4b5;
+  --accent-ink: #10241a;
+  --accent-soft: #1a2a20;
+  --accent-line: rgb(141 191 156 / 0.4);
+  --canvas-2: #1c1c1e;
+  --pos: #74c795;
+  --pos-soft: #15291d;
+  --neg: #e58c80;
+  --neg-soft: #331c19;
+  --warn: #d4b06e;
+  --warn-soft: #2b2416;
+  --info: #9aacd6;
+  --info-soft: #1c2233;
+  --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.05);
+  --gold: #d9b866;
+  --violet: #b8a6d8;
+  --violet-soft: #251f31;
+  --lilac: #b8a6d8;
+  --sand: #d9b98a;
+  --thumb: #636366;
+  --overlay: rgb(0 0 0 / 0.6);
+  --av-1: #1f2a22;
+  --av-2: #1f2430;
+  --av-3: #2b261c;
+  --av-4: #262130;
+  --av-5: #232a1d;
+  --av-6: #2e2220;
+  --hero-1: #3a5c48;
+  --hero-2: #2e4a3a;
+  --hero-3: #4b7059;
+  --hero-4: #2a4236;
+  --hero-5: #33503f;
+  --hero-6: #24392d;
+  --hero-ink: #e8f3ec;
+  --hero-btn: rgb(255 255 255 / 0.92);
+  --hero-btn-ink: #1b2b22;
+  --hero-shadow: rgb(0 0 0 / 0);
+  color-scheme: dark;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-hero-ink: var(--hero-ink);
+  --color-hero-btn: var(--hero-btn);
+  --color-hero-btn-ink: var(--hero-btn-ink);
+  --color-gold: var(--gold);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-thumb: var(--thumb);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-canvas-2: var(--canvas-2);
+  --color-pos: var(--pos);
+  --color-pos-soft: var(--pos-soft);
+  --color-neg: var(--neg);
+  --color-neg-soft: var(--neg-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-geist-sans), system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Motion tokens. Stronger than the CSS defaults: UI enters and responds with ease-out,
+   on-screen movement uses ease-in-out, sheets use the iOS drawer curve. Overriding
+   Tailwind's --ease-out / --ease-in-out makes `ease-out` / `ease-in-out` use them. */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html,
+body {
+  background: var(--canvas);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Installed PWA: no browser pull-to-refresh or rubber band behind the app chrome
+   (the header has its own refresh button). In a browser tab the default stays. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Controls feel native on touch: no 300 ms double-tap wait, no text selection or
+   callout on long-press. Content text stays selectable. */
+@layer base {
+  button,
+  a,
+  summary,
+  label,
+  select,
+  [role="button"],
+  [role="tab"] {
+    touch-action: manipulation;
+  }
+  button,
+  summary,
+  [role="button"],
+  [role="tab"],
+  nav a {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+body {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility t-label {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+
+@utility t-meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-3);
+}
+
+@utility t-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+@utility t-kpi {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility t-body {
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+
+/* Press feedback for anything tappable: responds on press (not on release), 160 ms
+   ease-out. Uses the `scale` property so it composes with translate utilities. */
+@utility tap {
+  transition-property: color, background-color, box-shadow, opacity, scale;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+  &:active:not(:disabled) {
+    scale: 0.97;
+  }
+}
+
+@utility text-gradient-accent {
+  color: var(--accent);
+}
+
+@utility card {
+  background: var(--surface);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+}
+
+/* The one decorative surface: a soft sage nebula behind the portfolio value. */
+@utility nebula {
+  background:
+    radial-gradient(60% 90% at 12% 18%, var(--hero-1) 0%, transparent 60%),
+    radial-gradient(55% 80% at 88% 10%, var(--hero-2) 0%, transparent 62%),
+    radial-gradient(70% 90% at 70% 100%, var(--hero-3) 0%, transparent 65%),
+    radial-gradient(45% 60% at 35% 85%, var(--hero-4) 0%, transparent 70%),
+    linear-gradient(135deg, var(--hero-5) 0%, var(--hero-6) 100%);
+  color: var(--hero-ink);
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 12px;
+}
+
+/* Route placeholder: invisible for the first 150 ms, so quick navigations go straight
+   from one screen to the next without a flash. */
+.route-loading {
+  animation: fade-in 150ms ease-out 150ms both;
+}
+
+/* Long lists (the radar): rows outside the screen are neither laid out nor painted until
+   they scroll near it. The intrinsic size keeps the scrollbar and the page height stable. */
+.radar-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+
+/* -------------------------------------------------------------- sheets
+   Bottom sheet on phones (slides up with the drawer curve, leaves faster than it
+   came), centred modal from `sm` (fades in from 0.96, origin centre). Keyframes,
+   not transitions, because Radix keeps the node mounted until the exit animation
+   ends. The exit has no `from`: it starts wherever a drag left the sheet. */
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes modal-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.sheet-overlay[data-state="open"] {
+  animation: fade-in 300ms var(--ease-out);
+}
+.sheet-overlay[data-state="closed"] {
+  animation: fade-out 200ms ease;
+}
+
+.sheet {
+  overscroll-behavior: contain;
+}
+.sheet[data-state="open"] {
+  animation: sheet-in 420ms var(--ease-drawer);
+}
+.sheet[data-state="closed"] {
+  animation: sheet-out 240ms var(--ease-drawer);
+}
+
+@media (min-width: 40rem) {
+  .sheet[data-state="open"] {
+    animation: modal-in 220ms var(--ease-out);
+  }
+  .sheet[data-state="closed"] {
+    animation: modal-out 150ms ease;
+  }
+}
+
+/* Reduced motion means gentler, not none: keep fades that explain a change, drop
+   movement (sheet slides, press scaling, the skeleton sweep). */
+@media (prefers-reduced-motion: reduce) {
+  .sheet[data-state="open"] {
+    animation: fade-in 200ms ease;
+  }
+  .sheet[data-state="closed"] {
+    animation: fade-out 150ms ease;
+  }
+  .tap:active:not(:disabled) {
+    scale: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* Toast icons carry the gain / loss colours, not the text colour. */
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--pos);
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--neg);
+}

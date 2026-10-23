@@ -4,9 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Rebuild every day so new notes in the vault reach the site, and on demand from the Actions tab.
+  # Rebuild every day so new notes in the vault and WarrenIA's latest analysis reach the site (its
+  # engine runs at 05:15 UTC, with a retry at 11:05), and on demand from the Actions tab.
   schedule:
-    - cron: '17 5 * * *'
+    - cron: '47 11 * * *'
   workflow_dispatch:
 
 permissions:
@@ -48,6 +49,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # WarrenIA's public extract of the latest night (no prices), for the pavilion's app
+      - run: npm run warrenia:data
       - run: npm run check
       - run: npm test
       - run: npm run build
@@ -85,7 +88,7 @@ jobs:
           # the author's name is never published, only the alias
           ! curl -fsS "$SITE/" | grep -qiE 'Héctor|Sanchis[^p]|hshector' || { echo "::error::$SITE/ shows the author's name"; exit 1; }
           curl -fsS "$SITE/" | grep -q 'data-island' || { echo "::error::$SITE/ did not serve the island"; exit 1; }
-          for path in /biblioteca /warrenia /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
+          for path in /biblioteca /warrenia /warrenia-app/ /warrenia-app/data/latest.json /warrenia-app/data/radar.json /constelacion /data/graph.json /data/graph.bin /biblioteca/daniel-yergin-the-prize /biblioteca/tema/finanzas; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE$path")
             [ "$code" = 200 ] || { echo "::error::$SITE$path returned $code"; exit 1; }
           done

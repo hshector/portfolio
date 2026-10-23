@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import nameGlyphs from './name-glyphs.json';
 import { FOG_APPLY, FOG_PARS, OUT, patchMaterial, type Shared } from './shaders';
+import { buildBolsa } from './bolsa';
 import { buildSite } from './site';
 import type { LightUniforms } from './palette';
 import {
@@ -35,7 +36,7 @@ export interface World {
   wetLevel: { value: number };
   /** Trunks, rocks, bales, walls and signposts the bull walks around. */
   obstacles: { x: number; z: number; r: number }[];
-  /** Spinning things (windmill, sculpture): updated each frame. */
+  /** Moving things (windmill, cranes, ticker tape, doors): updated each frame. */
   update(dt: number, t: number, night: number): void;
   setGrassCount(n: number): void;
   /** 0…1: hides the light beams and clouds (going up the observatory). */
@@ -44,6 +45,8 @@ export interface World {
   mapImage(): HTMLCanvasElement;
   /** The WarrenIA pavilion's screen: where it is, and its picture (redraw, then call update). */
   screen: { center: THREE.Vector3; normal: THREE.Vector3; width: number; height: number; canvas: HTMLCanvasElement; update(): void };
+  /** The WarrenIA building's doors: open while the visitor is inside. */
+  setDoors(open: boolean): void;
 }
 
 const TERRAIN = { sand: '#d8b888', wet: '#9c7f58', grassA: '#b8934a', grassB: '#93783d', rock: '#8d857c', path: '#c9a878' };
@@ -317,18 +320,13 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   boat.rotation.set(Math.PI / 2, 0, Math.PI); boat.position.set(JETTY.x + 3.2, 0.25, JETTY.z1 - 3);
   boat.castShadow = true; props.add(boat);
 
-  // WarrenIA: a glass pavilion in the app's sage green. On its back wall, facing the door, a big
-  // screen shows the app (drawn from the demo by src/warrenia-demo/screen.ts once the bull comes
-  // near); beside it a slowly turning data sculpture (the momentum radar).
+  // WarrenIA: a small, modern stock-exchange palace (bolsa.ts) with its mark carved in the pediment.
+  // On its back wall, facing the doors, a big screen shows the app's radar (drawn from the public
+  // extract by warrenia-screen.ts once the bull comes near); it can only be seen from inside.
   const w = SITES.warrenia, wy = height(w.x, w.z);
   const frame = mat(0x22252b);
-  const sage = 0x9fd1ae;
-  const glass = new THREE.MeshStandardMaterial({ color: 0xcfe3d3, transparent: true, opacity: 0.22, roughness: 0.08, metalness: 0.2, depthWrite: false });
-  box(10, 0.3, 7, mat(0xd8cdbb), w.x, wy + 0.15, w.z);
-  const g1 = box(9.4, 4, 6.4, glass, w.x, wy + 2.3, w.z); g1.castShadow = false;
-  for (const [dx, dz] of [[-4.7, -3.2], [4.7, -3.2], [-4.7, 3.2], [4.7, 3.2]]) box(0.2, 4.2, 0.2, frame, w.x + dx, wy + 2.4, w.z + dz);
-  box(9.8, 0.25, 6.8, frame, w.x, wy + 4.4, w.z);
-  box(6, 0.1, 3.5, mat(0x16241b, 0x8dbf9c, 0.9), w.x, wy + 0.35, w.z);
+  const bolsa = buildBolsa(w.x, wy, w.z, mat);
+  props.add(bolsa.group);
   // the screen: 5.4 × 3.2 m (the demo panel's shape), its face looking east (+x), towards the door
   const screenW = 5.4, screenH = 3.2;
   const screenCenter = new THREE.Vector3(w.x - 4.3, wy + 2.25, w.z);
@@ -336,7 +334,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   const screenCanvas = document.createElement('canvas');
   screenCanvas.width = 1080; screenCanvas.height = 640;
   {
-    // until the demo is drawn: the app's sage nebula and its name
+    // until the radar is drawn: the app's sage and its name
     const c = screenCanvas.getContext('2d')!;
     const g = c.createLinearGradient(0, 0, 1080, 640);
     g.addColorStop(0, '#cfe3d3'); g.addColorStop(1, '#9cc2aa');
@@ -351,21 +349,6 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   screen.position.copy(screenCenter);
   screen.rotation.y = Math.PI / 2;
   props.add(screen);
-  const sculpture = new THREE.Group();
-  sculpture.position.set(w.x + 2.6, wy + 1.5, w.z - 1.9);
-  sculpture.scale.setScalar(0.45);
-  const radarN = 140, radar = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: sage, emissiveIntensity: 1.6 }), radarN);
-  const ro = new THREE.Object3D();
-  for (let i = 0; i < radarN; i++) {
-    const a = (i / radarN) * Math.PI * 2 * 3, r = 0.4 + (i / radarN) * 1.6, y = Math.sin(a * 1.7) * 0.5;
-    ro.position.set(Math.cos(a) * r, y, Math.sin(a) * r); ro.updateMatrix(); radar.setMatrixAt(i, ro.matrix);
-  }
-  sculpture.add(radar);
-  for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7 + i * 0.6, 0.015, 6, 64), new THREE.MeshStandardMaterial({ color: 0x0c1a12, emissive: sage, emissiveIntensity: 0.9 }));
-    ring.rotation.x = Math.PI / 2; sculpture.add(ring);
-  }
-  scene.add(sculpture);
 
   // the next project, under construction: a concrete frame going up, scaffolding, two tower
   // cranes turning with their loads, and the site's fence with the "coming soon" board
@@ -517,8 +500,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
       wetLevel.value = Math.max(seaLevel, wetLevel.value - dt * 0.012);
       rotor.rotation.z -= dt * (1.2 + shared.wind.value * 2);
       site.update(time, night);
-      sculpture.rotation.y += dt * 0.25;
-      radar.position.y = Math.sin(time * 0.8) * 0.15;
+      bolsa.update(dt);
       for (const c of clouds) c.position.x = ((c.position.x + dt * 1.2 + 260) % 520) - 260;
       (beamMat.uniforms.uColor.value as THREE.Color).set('#ffd59a').lerp(new THREE.Color('#9fc0ff'), night);
     },
@@ -528,6 +510,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
       for (const c of clouds) { (c.material as THREE.SpriteMaterial).opacity = 0.85 * (1 - f); c.visible = f < 0.999; }
     },
     mapImage() { return drawMap(); },
+    setDoors(open) { bolsa.setDoors(open); },
     screen: { center: screenCenter, normal: new THREE.Vector3(1, 0, 0), width: screenW, height: screenH, canvas: screenCanvas, update() { screenTex.needsUpdate = true; } },
   };
 }

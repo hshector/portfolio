@@ -1,0 +1,122 @@
+diff -ruN a/web/app/(app)/research/[ticker]/page.tsx b/web/app/(app)/research/[ticker]/page.tsx
+--- a/web/app/(app)/research/[ticker]/page.tsx
++++ b/web/app/(app)/research/[ticker]/page.tsx
+@@ -15,6 +15,7 @@
+ import { loadPortfolio } from "@/lib/portfolio/load";
+ import { portfolioRelevance } from "@/lib/portfolio/relevance";
+ import { requireStore } from "@/lib/user/store";
++import { TradingViewChart, tvSymbol } from "@demo/tradingview";
+ 
+ /** The ticker in the URL; a malformed escape ("%E0") is a not-found, not a crash. */
+ function tickerOf(raw: string): string {
+@@ -129,14 +130,14 @@
+       </div>
+ 
+       <div>
+-        <div className="num text-[40px] font-bold leading-tight tracking-[-0.03em]">${num(r.px)}</div>
++        {r.px !== null && <div className="num text-[40px] font-bold leading-tight tracking-[-0.03em]">${num(r.px)}</div>}
+         <p className="text-[14px] text-ink-2">
+           <Delta v={r.d1} className="font-semibold" /> today · close of {dateLabel(latest?.data_asof)}
+         </p>
+       </div>
+ 
+       <Card pad={false} className="px-3 py-4 sm:px-5">
+-        {asset.series ? <AssetCharts sessions={meta.sessions} close={asset.series.c} bench={bench?.series?.c} benchName={meta.primary_benchmark} /> : <p className="px-2 text-ink-3">No price history.</p>}
++        {asset.series ? <AssetCharts sessions={meta.sessions} close={asset.series.c} bench={bench?.series?.c} benchName={meta.primary_benchmark} /> : <TradingViewChart symbols={[tvSymbol(ticker, r.ex)]} />}
+       </Card>
+ 
+       {!asset.eligible ? (
+diff -ruN a/web/app/(app)/research/compare/page.tsx b/web/app/(app)/research/compare/page.tsx
+--- a/web/app/(app)/research/compare/page.tsx
++++ b/web/app/(app)/research/compare/page.tsx
+@@ -7,6 +7,7 @@
+ import { compactUsd, num, pct } from "@/lib/format";
+ import { getAssets, loadMarket } from "@/lib/market/source";
+ import type { RadarRow } from "@/lib/market/types";
++import { TradingViewChart, tvSymbol } from "@demo/tradingview";
+ 
+ export const metadata = { title: "Compare" };
+ 
+@@ -73,7 +74,11 @@
+       ) : (
+         <div className="flex flex-col gap-4">
+           <Panel title="Relative performance">
+-            <CompareChart sessions={meta.sessions} series={found.map((t) => ({ t, c: assets[t].series?.c ?? [] }))} />
++            {found.some((t) => assets[t].series) ? (
++              <CompareChart sessions={meta.sessions} series={found.map((t) => ({ t, c: assets[t].series?.c ?? [] }))} />
++            ) : (
++              <TradingViewChart symbols={found.map((t) => tvSymbol(t, assets[t].row.ex))} />
++            )}
+           </Panel>
+           <Panel pad={false}>
+             <div className="overflow-x-auto">
+diff -ruN a/web/app/(app)/settings/page.tsx b/web/app/(app)/settings/page.tsx
+--- a/web/app/(app)/settings/page.tsx
++++ b/web/app/(app)/settings/page.tsx
+@@ -597,7 +597,7 @@
+             </>
+           ) : (
+             <>
+-              Local development mode: data stored in <code className="font-mono">web/.data/user.json</code>, no sign-in. Not available on Vercel.
++              Demo: no sign-in. Your plan, portfolio and watchlist are stored only in this browser; nobody else sees them.
+             </>
+           )}
+         </p>
+diff -ruN a/web/app/globals.css b/web/app/globals.css
+--- a/web/app/globals.css
++++ b/web/app/globals.css
+@@ -1,4 +1,6 @@
+-@import "tailwindcss";
++/* demo: the classes are in this app and in the demo's own files */
++@import "tailwindcss" source("../");
++@source "../../../../src/warrenia-app";
+ 
+ /* -------------------------------------------------------------- tokens
+    Light, calm, app-like (iOS / Revolut / Trade Republic). One accent colour:
+diff -ruN a/web/components/fin/asset-avatar.tsx b/web/components/fin/asset-avatar.tsx
+--- a/web/components/fin/asset-avatar.tsx
++++ b/web/components/fin/asset-avatar.tsx
+@@ -3,6 +3,7 @@
+ import { useState } from "react";
+ 
+ import { cx } from "@/components/ui/primitives";
++import { useHasLogo } from "@demo/logos";
+ 
+ const AVATAR = ["var(--av-1)", "var(--av-2)", "var(--av-3)", "var(--av-4)", "var(--av-5)", "var(--av-6)"];
+ 
+@@ -13,6 +14,8 @@
+  *  hairline ring in both themes, so brand colours never clash with the palette. */
+ export function AssetAvatar({ t, size = 40, logo = true }: { t: string; size?: number; logo?: boolean }) {
+   const [state, setState] = useState<LogoState>(logo ? "loading" : "none");
++  // demo: only the logos the public extract has
++  const has = useHasLogo(t);
+   let h = 0;
+   for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+   return (
+@@ -21,11 +24,11 @@
+       style={{ width: size, height: size, background: AVATAR[h % AVATAR.length] }}
+     >
+       {state !== "ok" && t.slice(0, 4)}
+-      {state !== "none" && (
++      {state !== "none" && has && (
+         // A plain <img>: tiny, already-cached files; next/image would add a resize hop for nothing.
+         // eslint-disable-next-line @next/next/no-img-element
+         <img
+-          src={`/api/logo/${encodeURIComponent(t)}`}
++          src={`${import.meta.env.BASE_URL}data/logos/${encodeURIComponent(t)}.png`}
+           alt=""
+           width={size}
+           height={size}
+diff -ruN a/web/components/portfolio/forms.tsx b/web/components/portfolio/forms.tsx
+--- a/web/components/portfolio/forms.tsx
++++ b/web/components/portfolio/forms.tsx
+@@ -139,7 +139,8 @@
+   const [preset, setPreset] = useState<string>("");
+   const fromPlan = PRODUCTS.find((p) => p.isin === preset);
+   const d: Partial<Instrument> = instrument ?? (fromPlan ? { name: fromPlan.name, isin: fromPlan.isin, kind: instrumentKind(fromPlan), bucket: fromPlan.bucket, currency: "EUR" } : {});
+-  const [source, setSource] = useState(instrument?.price_source ?? "eodhd");
++  // demo: no EODHD or US prices are public, so a new instrument is priced with the prices you enter
++  const [source, setSource] = useState(instrument?.price_source ?? "manual");
+   const [state, action, pending] = useActionState<ActionResult, FormData>(saveInstrument, null);
+   useSuccessToast(state, () => setOpen(false));
+   return (

@@ -40,19 +40,15 @@ test('theme pages group concepts by letter', async ({ page }) => {
   await expect(page).toHaveURL(/#letra-B$/);
 });
 
-test('the WarrenIA page runs the demo, with fictitious data and no advice', async ({ page }) => {
+test('the WarrenIA page runs the app itself, with no advice', async ({ page }) => {
   await page.goto('/warrenia');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('WarrenIA');
-  const demo = page.locator('.wdemo');
-  await expect(demo.getByRole('note')).toContainText('Datos ficticios');
-  await expect(demo.getByRole('note')).toContainText('No es asesoramiento financiero');
-  await expect(demo.locator('.w-kpi')).toHaveText(/^[\d.]+\s€$/);
-  await demo.getByRole('tab', { name: 'Plan' }).click();
-  await expect(demo.getByText('Un rango, no una promesa')).toBeVisible();
-  await demo.getByRole('tab', { name: 'Radar' }).click();
-  await expect(demo.locator('.w-list li').first()).toContainText('Empresa Demo');
-  await demo.getByRole('tab', { name: 'Cartera' }).click();
-  await expect(demo.getByText('Impuesto estimado')).toBeVisible();
+  // (the frame loads lazily: scroll it into view first)
+  await page.locator('[data-warrenia] iframe').scrollIntoViewIfNeeded();
+  const app = page.frameLocator('[data-warrenia] iframe');
+  await app.getByRole('link', { name: 'Plan' }).last().click();
+  await expect(app.getByText('A range, not a promise.')).toBeVisible();
+  await expect(app.getByText('Not investment advice', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 

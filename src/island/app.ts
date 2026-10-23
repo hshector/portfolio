@@ -19,7 +19,7 @@ import { createShared } from './shaders';
 import { createLibrarySky } from './stars';
 import { createVisit } from './observatory';
 import { createPavilion } from './pavilion';
-import type { Tab } from '../warrenia-demo/ui';
+import { appPath, START } from './warrenia';
 import {
   DOORS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
 } from './terrain';
@@ -345,32 +345,32 @@ export async function startIsland({ root, places }: IslandOptions) {
   function drawScreen() {
     if (screenDrawn) return;
     screenDrawn = true;
-    import('../warrenia-demo/screen').then((m) => { m.drawScreen(world.screen.canvas); world.screen.update(); }).catch(() => (screenDrawn = false));
+    import('./warrenia-screen').then((m) => m.drawScreen(world.screen.canvas)).then(() => world.screen.update()).catch(() => (screenDrawn = false));
   }
-  let demoPromise: Promise<import('../warrenia-demo/ui').Demo> | null = null;
+  let demoPromise: Promise<import('./warrenia').Demo> | null = null;
   const pav = createPavilion({
     camera, canvas, host: demoHost, screen: world.screen,
-    demo: () => (demoPromise ??= import('../warrenia-demo/ui').then((m) => m.mountDemo(demoHost, {
-      closeLabel: '← Volver al toro',
+    demo: () => (demoPromise ??= import('./warrenia').then((m) => m.mountDemo(demoHost, {
       onClose: leavePavilion,
-      onTab: (t) => { if (location.hash.startsWith('#warrenia')) history.replaceState(null, '', t === 'inicio' ? '#warrenia' : `#warrenia/${t}`); },
+      onRoute: (p) => { if (location.hash.startsWith('#warrenia')) history.replaceState(null, '', p === START ? '#warrenia' : `#warrenia${p}`); },
     }))),
     followPose: () => visitFollowPose(),
     onState(st) {
       root.dataset.visit = st === 'island' ? 'island' : `pabellon-${st}`;
+      world.setDoors(st !== 'island');
       input.setEnabled(st === 'island');
       if (st === 'island') { canvas.focus({ preventScroll: true }); updatePlace(true); }
       else ui.prompt.hidden = true;
     },
   });
   /** Into the pavilion (from its door, the menu, or a link to #warrenia[/tab]). */
-  function enterPavilion(tab?: Tab, instant = false) {
+  function enterPavilion(path?: string, instant = false) {
     if (!idle()) return;
     if (!instant) history.pushState(null, '', '#warrenia');
     const d = DOORS.warrenia, w = SITES.warrenia;
     if (instant || Math.hypot(me.x - d.x, me.z - d.z) > 6) placeBull(d.x, d.z, Math.atan2(w.x - d.x, w.z - d.z));
     drawScreen();
-    pav.go(tab, instant);
+    pav.go(path, instant);
   }
   function leavePavilion() {
     if (pav.state !== 'open') return;
@@ -380,23 +380,22 @@ export async function startIsland({ root, places }: IslandOptions) {
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && pav.state === 'open' && !(e.target as HTMLElement).closest?.('select')) leavePavilion(); });
 
   // ---------------------------------------------------------------- links straight to a place
-  type Route = { to: 'sky'; slug?: string } | { to: 'warrenia'; tab?: Tab } | null;
-  const TAB_NAMES = ['inicio', 'plan', 'radar', 'cartera'];
+  type Route = { to: 'sky'; slug?: string } | { to: 'warrenia'; path?: string } | null;
   const route = (): Route => {
     const sky = location.hash.match(/^#observatorio(?:\/(.+))?$/);
     if (sky) return { to: 'sky', slug: sky[1] ? decodeURIComponent(sky[1]) : undefined };
-    const w = location.hash.match(/^#warrenia(?:\/(\w+))?$/);
-    if (w) return { to: 'warrenia', tab: TAB_NAMES.includes(w[1]) ? (w[1] as Tab) : undefined };
+    const w = location.hash.match(/^#warrenia(\/.*)?$/);
+    if (w) return { to: 'warrenia', path: appPath(w[1]) };
     return null;
   };
   addEventListener('popstate', () => {
     const r = route();
     if (r?.to !== 'sky' && visit.state === 'sky') visit.back();
     if (r?.to !== 'warrenia' && pav.state === 'open') { pav.back(); }
-    if (r?.to === 'warrenia' && pav.state === 'open') pav.demo?.show(r.tab ?? 'inicio');
+    if (r?.to === 'warrenia' && pav.state === 'open') pav.demo?.show(r.path ?? START);
     if (!r || !idle()) return;
     if (r.to === 'sky') goUp(r.slug, true);
-    else if (r.to === 'warrenia') enterPavilion(r.tab, true);
+    else if (r.to === 'warrenia') enterPavilion(r.path, true);
   });
   // start loading the sky's code once the night begins, so going up is instant
   let skyPreloaded = false;
@@ -516,8 +515,8 @@ export async function startIsland({ root, places }: IslandOptions) {
     goUp: (slug?: string) => goUp(slug),
     goDown,
     get pavilion() { return pav.state; },
-    get demoTab() { return pav.demo?.tab ?? null; },
-    enterWarrenia: (tab?: Tab) => enterPavilion(tab),
+    get demoPath() { return pav.demo?.path ?? null; },
+    enterWarrenia: (path?: string) => enterPavilion(path),
     leaveWarrenia: leavePavilion,
     goTo,
     renderer, camera, scene, shared, bullAnim: bull, props: world.props,
@@ -526,5 +525,5 @@ export async function startIsland({ root, places }: IslandOptions) {
   // a link straight to a place: #observatorio[/<note>] or #warrenia[/<tab>]
   const startIn = route();
   if (startIn?.to === 'sky') goUp(startIn.slug, true);
-  else if (startIn?.to === 'warrenia') enterPavilion(startIn.tab, true);
+  else if (startIn?.to === 'warrenia') enterPavilion(startIn.path, true);
 }

@@ -38,4 +38,8 @@ test('the site says nothing about its author but the alias', async ({ request })
     if (path !== '/404') expect(html, path).toContain('HSorollaP');
     expect(html, path).not.toMatch(/Héctor|H&#233;ctor|Sanchis|hshector|github\.com\/hs|@gmail/i);
   }
+  // nor WarrenIA's demo and its data
+  for (const path of ['/warrenia-app/', '/warrenia-app/data/SOURCES.md', '/warrenia-app/data/meta.json']) {
+    expect(await (await request.get(path)).text(), path).not.toMatch(/Héctor|Sanchis|hshector|@gmail/i);
+  }
 });

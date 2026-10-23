@@ -18,6 +18,7 @@ const pipeline = [
   { k: 'Artefactos', v: 'Ficheros inmutables por ejecución en Supabase Storage, con hash de configuración y commit' },
   { k: 'Web', v: 'Next.js 16 en Vercel: lee los artefactos ya calculados y calcula la cartera al instante en TypeScript' },
   { k: 'Usuario', v: 'Postgres con RLS solo para operaciones, ajustes y watchlist; login por enlace mágico' },
+  { k: 'Demo', v: 'Cada noche, un extracto público sin precios: puntuaciones, razones, fundamentales de la SEC y logos. La demo de esta página es la propia app leyéndolo' },
 ];
 const decisions = [
   ['Mercado en Python, cartera en TypeScript', 'El ranking es un cálculo vectorizado sobre miles de activos; la cartera debe recalcularse al instante al registrar una operación.'],
@@ -34,12 +35,12 @@ const decisions = [
       <h1>WarrenIA</h1>
       <p class="lede">{warrenia.summary}</p>
       <ul class="facts" aria-label="Datos">
-        <li><b>259</b> tests (100 del motor, 90 de la web, 69 E2E)</li>
+        <li>Tests del motor, de la web y <b>E2E</b> en cada cambio</li>
         <li><b>0 €</b> al mes</li>
         <li><b>PWA</b> instalable en el móvil</li>
       </ul>
       <a class="island-link" href="/#warrenia">Verlo dentro de la isla, en su pabellón</a>
-      <p class="note">La app real requiere acceso. La demo de abajo es la app de verdad en miniatura: el propio código de WarrenIA calculando, en tu navegador, una cartera, un plan y un radar inventados.</p>
+      <p class="note">La app real requiere acceso. La demo de abajo es la app de verdad, con el análisis real de la última noche: el radar, cada empresa con su análisis y sus fundamentales, el plan y la cartera. No muestra precios de mercado (sus proveedores no permiten publicarlos) y lo que anotes se queda solo en tu navegador. Está en inglés, como la app.</p>
     </header>
 
     <section class="demo" aria-label="Demo de WarrenIA">
@@ -68,11 +69,6 @@ const decisions = [
     </footer>
   </main>
 </Base>
-
-<script>
-  import { mountDemo } from '../warrenia-demo/ui';
-  mountDemo(document.querySelector<HTMLElement>('[data-warrenia]')!);
-</script>
 
 <style>
   main { max-width: 1040px; margin: 0 auto; padding-block: 40px 96px; display: grid; gap: 56px; }

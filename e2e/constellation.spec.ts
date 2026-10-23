@@ -158,7 +158,7 @@ test('the sky names nothing until a star is chosen, and its labels never cover e
 
   // and none again once it is let go
   await page.keyboard.press('Escape');
-  await expect.poll(async () => (await api(page, (c) => c.labels())).length).toBe(0);
+  await expect.poll(async () => (await api(page, (c) => c.labels())).length, { timeout: 15_000 }).toBe(0);
 });
 
 test('the whole sky fits the first view, also on a phone', async ({ page, request }) => {

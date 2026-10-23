@@ -8,7 +8,7 @@ test('home shows both projects without errors or sideways scroll', async ({ brow
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Héctor Sanchis');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('HSorollaP');
   await expect(page.getByRole('heading', { name: 'WarrenIA' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Notas de lectura' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Temáticas' }).getByRole('listitem')).toHaveCount(6);
@@ -29,4 +29,13 @@ test('fonts are self-hosted, not loaded from a third party', async ({ page }) =>
   await page.evaluate(() => document.fonts.ready);
   expect(external).toEqual([]);
   expect(await page.evaluate(() => document.fonts.check('800 16px "Bricolage Grotesque Variable"'))).toBe(true);
+});
+
+test('the site says nothing about its author but the alias', async ({ request }) => {
+  for (const path of ['/', '/warrenia', '/constelacion', '/biblioteca', '/404']) {
+    // (the workers.dev address is the Cloudflare account's, and changes in its dashboard, not here)
+    const html = (await (await request.get(path)).text()).replace(/https?:\/\/[^"'\s]*\.workers\.dev/g, '');
+    if (path !== '/404') expect(html, path).toContain('HSorollaP');
+    expect(html, path).not.toMatch(/Héctor|H&#233;ctor|Sanchis|hshector|github\.com\/hs|@gmail/i);
+  }
 });

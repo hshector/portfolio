@@ -6,7 +6,10 @@ dos proyectos se abren dentro de ella y nada lleva a otra página.
 - **WarrenIA** se abre en la pantalla del pabellón de cristal (`#warrenia`, `#warrenia/<pestaña>`).
 - **La biblioteca** es el cielo: desde el observatorio se sube a la constelación (`#observatorio`,
   `#observatorio/<nota>`).
-- **Sobre mí** es una tarjeta en el taller (`#sobre-mi`).
+- **El próximo proyecto** es una obra con grúas donde estaba el taller (`site.ts`), con el cartel
+  «Próximamente». No se entra.
+- **Del autor solo se publica el alias HSorollaP:** ni nombre, ni enlaces a GitHub, ni texto sobre él.
+  `e2e/home.spec.ts` lo comprueba en las páginas principales.
 
 Las páginas de siempre (`/warrenia`, `/constelacion`, `/biblioteca/…` y los proyectos bajo la isla)
 siguen existiendo como respaldo oculto: para buscadores, para quien no tiene 3D (sin WebGL o con
@@ -18,7 +21,8 @@ Código en `src/island/`:
 |---|---|
 | `terrain.ts` | Forma de la isla, caminos, lugares, superficies, por dónde puede ir el toro y rutas del mapa. Sin three.js; con tests (`tests/island.test.ts`). |
 | `palette.ts` | Las dos luces (atardecer y noche) y la mezcla según la distancia al observatorio. |
-| `world.ts` | Cielo, terreno con arena mojada, mar con resaca, hierba, encinas, muros, flores, los cuatro lugares, molino, tu nombre en piedra y carteles. |
+| `world.ts` | Cielo, terreno con arena mojada, mar con resaca, hierba, encinas, muros, flores, los cuatro lugares, molino, el alias en piedra y carteles. |
+| `site.ts` | La obra del próximo proyecto: estructura de hormigón, andamio, dos grúas torre que giran con su carga, valla y cartel «Próximamente»; luces rojas que parpadean y foco de noche. |
 | `shaders.ts` | Trozos de shader compartidos: niebla, árboles que se vuelven translúcidos y copas que se mecen. |
 | `bull.ts` | El toro: su postura de reposo, el pelaje, respiración, cola y cabeza que mira a los lugares. |
 | `locomotion.ts` | Los pasos del toro, generados cada fotograma: paso, trote, medio galope y galope, con las pezuñas clavadas donde pisan. |
@@ -82,7 +86,7 @@ La demo de WarrenIA está en `src/warrenia-demo/` (ver más abajo) y el cielo in
     simulados con semilla fija, y 36 «Empresa Demo» en el radar. Ningún nombre ni logo real.
   - La banda «Datos ficticios de demostración… No es asesoramiento financiero» está siempre a la
     vista, y la proyección dice «Un rango, no una promesa».
-- **Tu nombre** son letras de piedra extruidas de Bricolage Grotesque ExtraBold (SIL OFL 1.1). Los
+- **El alias (HSorollaP)** son letras de piedra extruidas de Bricolage Grotesque ExtraBold (SIL OFL 1.1). Los
   contornos se extraen con `scripts/assets/name.ts` (opentype.js, MIT) a `name-glyphs.json`, de 8 KB.
 - **Sonido sin ficheros:** todo se sintetiza en el navegador. No hay nada que licenciar ni que
   descargar. Empieza solo cuando el visitante pulsa el botón; hay un test que comprueba que antes no

@@ -3,6 +3,7 @@ import 'katex/dist/katex.min.css';
 import '@fontsource-variable/hanken-grotesk/wght-italic.css';
 import Base from '../layouts/Base.astro';
 import ConstellationUI from '../components/ConstellationUI.astro';
+import { author } from '../data/site';
 import { num } from '../lib/format';
 import { library } from '../lib/library';
 
@@ -11,7 +12,7 @@ const stars = report.books + report.concepts;
 ---
 <Base
   bare
-  title="Constelación · Biblioteca de Héctor Sanchis"
+  title={`Constelación · ${author.name}`}
   description={`Las ${num(stars)} notas de la biblioteca como un cielo en 3D: cada estrella es un libro o un concepto, y cada línea, un enlace entre ellos.`}
 >
   <ConstellationUI variant="page" />

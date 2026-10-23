@@ -40,7 +40,7 @@ test('the island opens on the home page, and is the whole site', async ({ page }
   info.annotations.push({ type: 'island ready (ms)', description: String(await isla(page, (i) => i.readyMs)) });
   await expect(page.locator('[data-hint]')).toBeVisible();
   // the visitor arrives at the jetty, at sunset, and is welcomed
-  await expect(page.locator('[data-prompt-title]')).toHaveText('La isla de Héctor');
+  await expect(page.locator('[data-prompt-title]')).toHaveText('La isla de HSorollaP');
   expect(await isla(page, (i) => i.night)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   // the page of projects underneath is only for the version without 3D
@@ -53,14 +53,12 @@ test('the skip menu goes to each place inside the island, never to another page'
   const skip = page.locator('.skip');
   await skip.locator('summary').click();
   // (the hrefs are for the version without 3D)
-  for (const [name, href] of [['WarrenIA', '/warrenia'], ['La biblioteca (constelación)', '/constelacion'], ['Sobre mí', '#sobre-mi']]) {
+  for (const [name, href] of [['WarrenIA', '/warrenia'], ['La biblioteca (constelación)', '/constelacion'], ['En obras: próximamente', '#proyectos']]) {
     await expect(skip.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
   }
-  await skip.getByRole('link', { name: 'Sobre mí', exact: true }).click();
-  await expect(page.locator('dialog[data-about]')).toBeVisible();
+  // the building site: the bull sets off along the paths
+  await skip.getByRole('link', { name: 'En obras: próximamente', exact: true }).click();
   await expect(page).toHaveURL(/\/\?lite$/);
-  await page.locator('dialog[data-about]').getByRole('button', { name: 'Ir al Pabellón WarrenIA' }).click();
-  await expect(page.locator('dialog[data-about]')).toBeHidden();
   expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
   await skip.locator('summary').click();
   await skip.getByRole('link', { name: 'WarrenIA', exact: true }).click();
@@ -170,10 +168,17 @@ test('the map sends the bull along the paths to a place', async ({ page }) => {
   await expect(page.locator('dialog[data-map]')).toBeVisible();
   await page.locator('[data-go="taller"]').click();
   await expect(page.locator('dialog[data-map]')).toBeHidden();
-  const d = () => isla(page, (i) => Math.hypot(i.bull.x - 26.5, i.bull.z - 10.5));
+  const d = () => isla(page, (i) => Math.hypot(i.bull.x - 25.5, i.bull.z - 10.8));
   const d0 = await d();
   expect(await isla(page, (i) => i.autopilot)).toBeGreaterThan(0);
   await expect.poll(d, { timeout: 60_000 }).toBeLessThan(d0 - 2);
+});
+
+test('the building site promises the next project and gives nothing away', async ({ page }) => {
+  await open(page);
+  await isla(page, (i) => i.place(24.5, 11, Math.PI / 2));
+  await expect(page.locator('[data-prompt-title]')).toHaveText('En obras · Próximamente');
+  await expect(page.locator('[data-prompt-go]')).toBeHidden();
 });
 
 test('birds take off when the bull comes close', async ({ page }) => {

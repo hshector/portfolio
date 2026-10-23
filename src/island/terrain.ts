@@ -18,7 +18,7 @@ export interface Site {
 export const SITES: Record<SiteId, Site> = {
   muelle: { id: 'muelle', x: 0, z: 44, r: 6, label: 'Muelle' },
   warrenia: { id: 'warrenia', x: -32, z: 6, r: 8, label: 'Pabellón WarrenIA' },
-  taller: { id: 'taller', x: 32, z: 10, r: 6, label: 'Taller' },
+  taller: { id: 'taller', x: 32, z: 10, r: 6, label: 'En obras' },
   observatorio: { id: 'observatorio', x: 0, z: -38, r: 7, label: 'Observatorio' },
 };
 
@@ -36,7 +36,7 @@ export const PATHS: [number, number][][] = [
 export const DOORS: Record<SiteId, { x: number; z: number }> = {
   muelle: { x: 0, z: 36 },
   warrenia: { x: -25, z: 7.5 },
-  taller: { x: 26.5, z: 10.5 },
+  taller: { x: 25.5, z: 10.8 }, // outside the site's fence
   observatorio: { x: 0, z: -31 },
 };
 
@@ -141,16 +141,21 @@ export const BLOCKERS = [
   { x: SITES.observatorio.x, z: SITES.observatorio.z, r: 4.5 },
 ];
 
-/** The two stone words of the name, on their plinths either side of the path (see world.ts). */
-export const NAME_BLOCKS = [
-  { x0: -13.2, x1: -3.6, z0: 30.2, z1: 31.9 },
-  { x0: 3.8, x1: 14.6, z0: 30.2, z1: 31.9 },
-];
+/** The stone name on its plinth, beside the path, turned towards the jetty (see world.ts). */
+export const NAME_ANGLE = 0.5;
+const nameEnd = (t: number) => ({ x: -9.6 + Math.cos(NAME_ANGLE) * 5.5 * t, z: 31 - Math.sin(NAME_ANGLE) * 5.5 * t });
+/** Where the bull can't go: a segment along the name, and how far from it. */
+export const NAME_BLOCKS = [{ x0: nameEnd(-1).x, z0: nameEnd(-1).z, x1: nameEnd(1).x, z1: nameEnd(1).z, r: 0.9 }];
+
+function distToSegment(x: number, z: number, x0: number, z0: number, x1: number, z1: number) {
+  const dx = x1 - x0, dz = z1 - z0, t = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (dx * dx + dz * dz)));
+  return Math.hypot(x - x0 - dx * t, z - z0 - dz * t);
+}
 
 export function walkable(x: number, z: number) {
   if (onJetty(x, z)) return true;
   if (height(x, z) < 0.2) return false;
-  if (NAME_BLOCKS.some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1)) return false;
+  if (NAME_BLOCKS.some((b) => distToSegment(x, z, b.x0, b.z0, b.x1, b.z1) < b.r)) return false;
   return BLOCKERS.every((b) => Math.hypot(x - b.x, z - b.z) > b.r);
 }
 
@@ -191,6 +196,6 @@ export function routeTo(x: number, z: number, id: SiteId): P[] {
     out.push(...arm(id).slice(1));
   }
   out[out.length - 1] = door; // stop at the door, not inside the building
-  // drop points that are (almost) the same
-  return out.filter((p, i) => i === 0 || Math.hypot(p.x - out[i - 1].x, p.z - out[i - 1].z) > 0.5);
+  // drop points that are (almost) the same, but always keep the door
+  return out.filter((p, i) => i === 0 || i === out.length - 1 || Math.hypot(p.x - out[i - 1].x, p.z - out[i - 1].z) > 0.5);
 }

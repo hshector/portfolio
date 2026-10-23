@@ -7,7 +7,7 @@ import opentype from 'opentype.js';
 const file = 'node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-800-normal.woff';
 const buf = readFileSync(file);
 const font = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-const words = ['HÉCTOR', 'SANCHIS'];
+const words = ['HSorollaP'];
 const out: Record<string, { width: number; commands: (string | number)[][] }> = {};
 for (const w of words) {
   // glyph by glyph (font.getPath trips on a contextual-substitution table opentype.js can't read)

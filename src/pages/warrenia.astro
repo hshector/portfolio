@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
-import { warrenia } from '../data/site';
+import { author, warrenia } from '../data/site';
 import WarreniaDemo from '../components/WarreniaDemo.astro';
 
 // Facts from the WarrenIA README and docs/ARCHITECTURE.md.
@@ -26,7 +26,7 @@ const decisions = [
   ['Fallar cerrado', 'Sin configuración no muestra nada, y el modo local sin login nunca funciona en producción.'],
 ];
 ---
-<Base title="WarrenIA · Héctor Sanchis" description={warrenia.summary}>
+<Base title={`WarrenIA · ${author.name}`} description={warrenia.summary}>
   <SiteHeader />
   <main>
     <header class="hero">
@@ -65,7 +65,6 @@ const decisions = [
 
     <footer class="end">
       <p>Herramienta de análisis: no ejecuta operaciones, no se conecta a ningún bróker y no presenta predicciones como certezas.</p>
-      <a href={warrenia.repo}>Ver el código en GitHub</a>
     </footer>
   </main>
 </Base>
@@ -98,5 +97,4 @@ const decisions = [
   .pipeline span { color: var(--ink-2); }
   @media (max-width: 560px) { .pipeline li { grid-template-columns: 28px minmax(0, 1fr); } .pipeline span { grid-column: 2; } }
   .end { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 24px; color: var(--ink-3); font-size: var(--step--1); }
-  .end a { color: var(--ink); justify-self: start; }
 </style>

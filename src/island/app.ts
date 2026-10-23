@@ -1,7 +1,7 @@
 // The island, put together: renderer, world, bull, camera, day-to-night, places, map, sound,
 // quality and the test API (window.__isla).
 //
-// Renderer: the classic WebGLRenderer. The prototype measured 60 fps on Héctor's laptop and phone
+// Renderer: the classic WebGLRenderer. The prototype measured 60 fps on the owner's laptop and phone
 // (21 Oct 2026), and WebGPURenderer's WebGL 2 fallback was 15–60× slower in our tests for the
 // constellation (docs/CONSTELLATION.md), so there is nothing to gain from it here.
 
@@ -104,7 +104,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     hint: $('[data-hint]'), prompt: $('[data-prompt]'), promptTitle: $('[data-prompt-title]'), promptText: $('[data-prompt-text]'),
     promptGo: $<HTMLAnchorElement>('[data-prompt-go]'), sound: $<HTMLButtonElement>('[data-sound]'), view: $<HTMLButtonElement>('[data-view]'),
     mapBtn: $<HTMLButtonElement>('[data-map-open]'), map: $<HTMLDialogElement>('dialog[data-map]'), mapCanvas: $<HTMLCanvasElement>('[data-map-canvas]'),
-    joystick: $('[data-joystick]'), debug: $('[data-debug]'), about: $<HTMLDialogElement>('dialog[data-about]'),
+    joystick: $('[data-joystick]'), debug: $('[data-debug]'),
   };
   const mapImage = world.mapImage();
 
@@ -115,11 +115,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     if (here === 'muelle') openMap();
     else if (here === 'observatorio') goUp();
     else if (here === 'warrenia') enterPavilion();
-    else openAbout();
-  }
-  function openAbout() {
-    if (ui.map.open) ui.map.close();
-    if (!ui.about.open) ui.about.showModal();
+    // (the building site has nothing to enter yet)
   }
   function openMap() {
     if (ui.map.open) { ui.map.close(); return; }
@@ -142,7 +138,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     ui.sound.title = ui.sound.getAttribute('aria-label')!;
   });
   ui.promptGo.addEventListener('click', (e) => { e.preventDefault(); act(); });
-  // every link to a place (the "Saltar a…" menu, the map, the brand) goes there in the island;
+  // every link to a place (the "Saltar a…" menu, the map) goes there in the island;
   // their hrefs are for the version without 3D
   root.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest<HTMLElement>('[data-island-go]');
@@ -151,15 +147,9 @@ export async function startIsland({ root, places }: IslandOptions) {
     a.closest('details')?.removeAttribute('open');
     if (ui.map.open) ui.map.close();
     const where = a.dataset.islandGo;
-    if (ui.about.open && where !== 'about') ui.about.close();
     if (where === 'warrenia') enterPavilion();
     else if (where === 'observatorio') goUp();
-    else if (where === 'about') openAbout();
-  });
-  ui.about.addEventListener('click', (e) => {
-    const go = (e.target as HTMLElement).closest<HTMLElement>('[data-go]');
-    if (go) { goTo(go.dataset.go as SiteId); ui.about.close(); }
-    else if (e.target === ui.about) ui.about.close();
+    else if (where === 'obra') goTo('taller');
   });
   ui.map.addEventListener('click', (e) => {
     const go = (e.target as HTMLElement).closest<HTMLElement>('[data-go]');
@@ -390,14 +380,14 @@ export async function startIsland({ root, places }: IslandOptions) {
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && pav.state === 'open' && !(e.target as HTMLElement).closest?.('select')) leavePavilion(); });
 
   // ---------------------------------------------------------------- links straight to a place
-  type Route = { to: 'sky'; slug?: string } | { to: 'warrenia'; tab?: Tab } | { to: 'about' } | null;
+  type Route = { to: 'sky'; slug?: string } | { to: 'warrenia'; tab?: Tab } | null;
   const TAB_NAMES = ['inicio', 'plan', 'radar', 'cartera'];
   const route = (): Route => {
     const sky = location.hash.match(/^#observatorio(?:\/(.+))?$/);
     if (sky) return { to: 'sky', slug: sky[1] ? decodeURIComponent(sky[1]) : undefined };
     const w = location.hash.match(/^#warrenia(?:\/(\w+))?$/);
     if (w) return { to: 'warrenia', tab: TAB_NAMES.includes(w[1]) ? (w[1] as Tab) : undefined };
-    return location.hash === '#sobre-mi' ? { to: 'about' } : null;
+    return null;
   };
   addEventListener('popstate', () => {
     const r = route();
@@ -427,6 +417,7 @@ export async function startIsland({ root, places }: IslandOptions) {
     ui.promptText.textContent = p.text;
     ui.promptGo.textContent = p.action;
     ui.promptGo.href = p.href ?? '#';
+    ui.prompt.toggleAttribute('data-no-action', !p.action);
   }
   // the screen is drawn when the bull comes within 40 m of the pavilion
   const nearPavilion = () => Math.hypot(me.x - SITES.warrenia.x, me.z - SITES.warrenia.z) < 40;
@@ -532,9 +523,8 @@ export async function startIsland({ root, places }: IslandOptions) {
     renderer, camera, scene, shared, bullAnim: bull, props: world.props,
   };
   requestAnimationFrame(frame);
-  // a link straight to a place: #observatorio[/<note>], #warrenia[/<tab>] or #sobre-mi
+  // a link straight to a place: #observatorio[/<note>] or #warrenia[/<tab>]
   const startIn = route();
   if (startIn?.to === 'sky') goUp(startIn.slug, true);
   else if (startIn?.to === 'warrenia') enterPavilion(startIn.tab, true);
-  else if (startIn?.to === 'about') openAbout();
 }

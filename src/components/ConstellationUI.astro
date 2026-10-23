@@ -3,6 +3,7 @@
 // - variant "page": the stand-alone /constelacion page (the fallback outside the island), with its own canvas;
 // - variant "island": laid over the island's canvas when the bull reaches the observatory and the
 //   camera looks up (src/island/app.ts), with a button back to the bull.
+import { author } from '../data/site';
 import { num } from '../lib/format';
 import { library } from '../lib/library';
 import { THEMES } from '../lib/themes';
@@ -20,7 +21,7 @@ const Root = variant === 'page' ? 'main' : 'div';
 
   <header class="bar">
     {variant === 'page'
-      ? <a class="brand" href="/">Héctor Sanchis</a>
+      ? <a class="brand" href="/">{author.name}</a>
       : <button class="back" type="button" data-sky-exit>← Volver al toro</button>}
     <div class="search" role="combobox" aria-haspopup="listbox" aria-owns="search-results">
       <label class="sr" for="search">Buscar una nota</label>

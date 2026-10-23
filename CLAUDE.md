@@ -50,7 +50,9 @@ https://claude.ai/artifact/A6TaTVqwyFcd9SjAfCQ3yq
 - Pasos del toro: procedurales (`src/island/locomotion.ts`, tabla de pasos e IK); del clip solo se usa el reposo.
 - Observatorio (`observatory.ts`): sube a la constelación en el mismo lienzo. `#observatorio[/<nota>]`.
 - Pabellón (`pavilion.ts`): la demo de WarrenIA (`src/warrenia-demo/`, español, verde salvia, datos ficticios)
-  se abre sobre su pantalla. `#warrenia[/<pestaña>]`. Taller: tarjeta «Sobre mí» (`#sobre-mi`).
+  se abre sobre su pantalla. `#warrenia[/<pestaña>]`. Donde estaba el taller hay una obra
+  con grúas (`site.ts`), «Próximamente».
+- Del autor solo se publica el alias **HSorollaP** (`src/data/site.ts`): ni su nombre, ni GitHub, ni texto sobre él.
 - `vendor/warrenia/`: código de WarrenIA copiado con `scripts/warrenia/vendor.sh` (commit en su README); sus tests
   corren con los nuestros. Para actualizar, vuelve a ejecutar el script con un checkout nuevo.
 - Toro: «bull walk cycle» de Lucy Greenhill (CC BY 4.0), en `assets-src/toro/`; `scripts/assets/toro.sh` genera

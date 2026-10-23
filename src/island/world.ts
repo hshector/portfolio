@@ -6,9 +6,10 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import nameGlyphs from './name-glyphs.json';
 import { FOG_APPLY, FOG_PARS, OUT, patchMaterial, type Shared } from './shaders';
+import { buildSite } from './site';
 import type { LightUniforms } from './palette';
 import {
-  DOORS, HUB, JETTY, SITES, WORLD_SIZE, distToPaths, fbm, height, seeded, slopeAt, smoothstep,
+  DOORS, HUB, JETTY, NAME_ANGLE, SITES, WORLD_SIZE, distToPaths, fbm, height, seeded, slopeAt, smoothstep,
 } from './terrain';
 
 export interface Quality {
@@ -366,15 +367,14 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   }
   scene.add(sculpture);
 
-  // the workshop: a whitewashed cortijo with a tiled roof, a door and a chimney
+  // the next project, under construction: a concrete frame going up, scaffolding, two tower
+  // cranes turning with their loads, and the site's fence with the "coming soon" board
   const t = SITES.taller, ty = height(t.x, t.z);
-  box(6.4, 3.2, 5, mat(0xf3eee4), t.x, ty + 1.6, t.z, 0.3);
-  const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 4.6, 2, 4, 1), mat(0xb55a34));
-  roof.position.set(t.x, ty + 4.2, t.z); roof.rotation.y = Math.PI / 4 + 0.3; roof.castShadow = true; props.add(roof);
-  const facing = new THREE.Vector3(-Math.cos(0.3), 0, Math.sin(0.3)); // the door looks west, towards the path
-  box(0.12, 2.0, 1.1, mat(0x5a3a22), t.x + facing.x * 3.22, ty + 1.0, t.z + facing.z * 3.22, 0.3);
-  box(0.6, 1.4, 0.6, mat(0xf3eee4), t.x + 1.2, ty + 4.6, t.z - 0.9);
-  for (const dz of [-1.6, 1.6]) box(0.1, 0.8, 0.8, mat(0x1b2a3a, 0xffcf7a, 0.6), t.x + facing.x * 3.22 - Math.sin(0.3) * dz, ty + 1.9, t.z + facing.z * 3.22 - Math.cos(0.3) * dz, 0.3);
+  const concrete = mat(0xb9b4ab), rebar = mat(0x8a4b2a);
+  const site = buildSite(t.x, ty, t.z, concrete, rebar, mat);
+  props.add(site.static);
+  scene.add(...site.moving);
+
   // a windmill water pump by the workshop, turning in the wind
   const mill = new THREE.Group();
   const mx = t.x + 7, mz = t.z - 6, my = height(mx, mz);
@@ -420,35 +420,41 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
 
   // ---------------------------------------------------------------- the name, in stone, flanking the path
   const stone = new THREE.MeshStandardMaterial({ color: 0xe8dcc6, roughness: 0.85 });
-  const word = (text: keyof typeof nameGlyphs, cx: number, cz: number, sizeM: number) => {
+  const word = (text: keyof typeof nameGlyphs, cx: number, cz: number, sizeM: number, ry: number) => {
     const g = nameGlyphs[text];
     const shapes = shapesFrom(g.commands as (string | number)[][]);
     const geom = new THREE.ExtrudeGeometry(shapes, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.012, bevelSegments: 1, curveSegments: 6 });
     geom.scale(sizeM, sizeM, sizeM / 0.5);
     geom.translate((-g.width * sizeM) / 2, 0, 0);
     const mesh = new THREE.Mesh(geom, stone);
-    mesh.position.set(cx, Math.min(height(cx - 3, cz), height(cx, cz), height(cx + 3, cz)) - 0.05, cz);
-    mesh.rotation.y = 0; // faces south, towards the visitor arriving from the jetty
+    // on a plinth as high as the highest ground under it, so no letter sinks into the slope
+    const half = (g.width * sizeM) / 2, ys = [-1, -0.5, 0, 0.5, 1].map((t) => height(cx + Math.cos(ry) * half * t, cz - Math.sin(ry) * half * t));
+    const lo = Math.min(...ys), hi = Math.max(...ys);
+    mesh.position.set(cx, hi + 0.15, cz);
+    mesh.rotation.y = ry; // turned to the visitor arriving from the jetty
     mesh.castShadow = mesh.receiveShadow = true;
     props.add(mesh);
-    // a plinth under each word
-    box(g.width * sizeM + 0.8, 0.3, 0.9, mat(0xb8afa2), cx, mesh.position.y + 0.1, cz + 0.05);
+    box(g.width * sizeM + 0.8, hi - lo + 0.45, 0.9, mat(0xb8afa2), cx + Math.sin(ry) * 0.05, (hi + lo) / 2 - 0.05, cz + Math.cos(ry) * 0.05, ry);
   };
-  word('HÉCTOR', -8.4, 31, 2.1);
-  word('SANCHIS', 9.2, 31, 2.1);
+  word('HSorollaP', -9.6, 31, 2.1, NAME_ANGLE);
 
   // ---------------------------------------------------------------- signposts
   const signs: THREE.Mesh[] = [];
   const signpost = (x: number, z: number, boards: { text: string; angle: number }[]) => {
     const y = height(x, z);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 3.2, 6), wood);
-    post.position.set(x, y + 1.6, z); post.castShadow = true; props.add(post);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 3.9, 6), wood);
+    post.position.set(x, y + 1.95, z); post.castShadow = true; props.add(post);
     boards.forEach((b, i) => {
-      const tex = textTexture(b.text);
-      const m = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.42, 0.06), [wood, wood, wood, wood, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }), wood]);
-      m.position.set(x, y + 2.7 - i * 0.55, z);
+      // painted on both faces (from behind, the arrow points the other way), and faintly lit by
+      // their own paint so they still read in shadow and at dusk
+      const face = (back: boolean) => {
+        const map = textTexture(b.text, back);
+        return new THREE.MeshStandardMaterial({ map, roughness: 0.8, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.32 });
+      };
+      const m = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.82, 0.08), [wood, wood, wood, wood, face(false), face(true)]);
+      m.position.set(x, y + 3.3 - i * 0.95, z);
       m.rotation.y = b.angle;
-      m.translateX(1.1);
+      m.translateX(1.72);
       m.castShadow = true;
       props.add(m); signs.push(m);
     });
@@ -456,9 +462,9 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   // at the crossroads: boards point along each path (angle = direction of travel, measured from +x)
   const dir = (tx: number, tz: number) => -Math.atan2(tz - HUB.z, tx - HUB.x);
   signpost(HUB.x + 1.6, HUB.z + 1.6, [
-    { text: 'Observatorio · Biblioteca', angle: dir(-2, -6) },
-    { text: 'Pabellón WarrenIA', angle: dir(-18, 10) },
-    { text: 'Taller · Sobre mí', angle: dir(16, 12) },
+    { text: 'Biblioteca', angle: dir(-2, -6) },
+    { text: 'WarrenIA', angle: dir(-18, 10) },
+    { text: 'Próximamente', angle: dir(16, 12) },
   ]);
 
   // ---------------------------------------------------------------- clouds
@@ -490,6 +496,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
     ...wallStones.filter((_, i) => i % 2 === 0).map((p) => ({ x: p.x, z: p.z, r: 0.45 })),
     { x: HUB.x + 1.6, z: HUB.z + 1.6, r: 0.4 },
     { x: mx, z: mz, r: 0.9 }, { x: mx - 1.6, z: mz + 1.4, r: 1.2 },
+    ...site.obstacles,
   ];
 
   // see-through for everything that can stand between the camera and the bull; crowns also sway
@@ -509,6 +516,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
       seaLevelU.value = seaLevel;
       wetLevel.value = Math.max(seaLevel, wetLevel.value - dt * 0.012);
       rotor.rotation.z -= dt * (1.2 + shared.wind.value * 2);
+      site.update(time, night);
       sculpture.rotation.y += dt * 0.25;
       radar.position.y = Math.sin(time * 0.8) * 0.15;
       for (const c of clouds) c.position.x = ((c.position.x + dt * 1.2 + 260) % 520) - 260;
@@ -557,21 +565,24 @@ function inside(p: THREE.Vector2, poly: THREE.Vector2[]) {
 }
 
 /** Painted wooden board with a place name. */
-function textTexture(text: string) {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 96;
+/** A signpost board: dark letters on pale painted wood, the arrow on the side it points to. */
+function textTexture(text: string, back = false) {
+  const W = 1024, H = 233, c = document.createElement('canvas');
+  c.width = W; c.height = H;
   const x = c.getContext('2d')!;
-  x.fillStyle = '#6b4a2e'; x.fillRect(0, 0, 512, 96);
-  x.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 6; i++) x.fillRect(0, 12 + i * 15, 512, 2);
-  x.fillStyle = '#f3e6cf';
-  x.font = '700 44px "Bricolage Grotesque Variable", system-ui, sans-serif';
-  x.textBaseline = 'middle';
-  x.fillText(text, 26, 50, 460);
-  // arrow tip
-  x.beginPath(); x.moveTo(488, 30); x.lineTo(506, 48); x.lineTo(488, 66); x.fill();
+  x.fillStyle = '#efe2c6'; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(90,60,30,0.08)'; for (let i = 0; i < 8; i++) x.fillRect(0, 14 + i * 28, W, 3);
+  x.strokeStyle = '#5a3a22'; x.lineWidth = 10; x.strokeRect(5, 5, W - 10, H - 10);
+  x.fillStyle = '#2b1a0e';
+  x.font = '800 138px "Bricolage Grotesque Variable", system-ui, sans-serif';
+  x.textBaseline = 'middle'; x.textAlign = 'center';
+  x.fillText(text, back ? W / 2 + 40 : W / 2 - 40, H / 2 + 4, W - 190);
+  // the arrow
+  const ax = back ? 30 : W - 30, d = back ? 1 : -1;
+  x.beginPath(); x.moveTo(ax, H / 2); x.lineTo(ax + d * 80, H / 2 - 62); x.lineTo(ax + d * 80, H / 2 + 62); x.fill();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 

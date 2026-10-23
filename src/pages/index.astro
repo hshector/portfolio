@@ -14,9 +14,9 @@ const { report } = library();
 const notes = report.books + report.concepts;
 // what each place says when the bull reaches its door (src/island/app.ts)
 const places = {
-  muelle: { title: 'La isla de Héctor', text: 'Lleva al toro a los tres lugares de la isla, o abre el mapa para ir directo.', action: 'Abrir el mapa' },
+  muelle: { title: `La isla de ${author.name}`, text: 'Lleva al toro a los tres lugares de la isla, o abre el mapa para ir directo.', action: 'Abrir el mapa' },
   warrenia: { title: 'Pabellón WarrenIA', text: 'Sistema personal de inteligencia financiera, con datos de demostración.', action: 'Entrar en WarrenIA', href: '/warrenia' },
-  taller: { title: 'Taller · Sobre mí', text: 'Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo.', action: 'Conocer a Héctor', href: '#sobre-mi' },
+  taller: { title: 'En obras · Próximamente', text: 'Aquí se está levantando el próximo proyecto. Todavía no se puede contar nada: vuelve pronto.', action: '' },
   observatorio: { title: 'Observatorio · La biblioteca', text: `${num(notes)} notas de ${num(report.books)} libros. Sube y recórrelas como una constelación.`, action: 'Subir al observatorio', href: '/constelacion' },
 };
 ---
@@ -24,18 +24,18 @@ const places = {
   title={`${author.name} · proyectos`}
   description="Una isla en 3D que se recorre a lomos de un toro: WarrenIA, un sistema personal de inteligencia financiera, y una biblioteca de 48 libros y más de 3.000 conceptos conectados."
 >
-  <section class="island" data-island data-state="loading" aria-label="La isla de Héctor en 3D">
+  <section class="island" data-island data-state="loading" aria-label={`La isla de ${author.name} en 3D`}>
     <canvas class="island-canvas" tabindex="0" aria-label="Isla en 3D con un toro negro. Muévelo con WASD o las flechas; la lista de lugares está en «Saltar a…» y en el mapa."></canvas>
     <div class="joystick" data-joystick hidden><i></i></div>
 
     <header class="top">
-      <a class="brand" href="#sobre-mi" data-island-go="about">{author.name}</a>
+      <span class="brand">{author.name}</span>
       <details class="skip">
         <summary>Saltar a…</summary>
         <ul>
           <li><a href="/warrenia" data-island-go="warrenia">WarrenIA</a></li>
           <li><a href="/constelacion" data-island-go="observatorio">La biblioteca (constelación)</a></li>
-          <li><a href="#sobre-mi" data-island-go="about">Sobre mí</a></li>
+          <li><a href="#proyectos" data-island-go="obra">En obras: próximamente</a></li>
         </ul>
       </details>
       <div class="tools">
@@ -88,19 +88,9 @@ const places = {
       <canvas data-map-canvas width="440" height="440" aria-hidden="true"></canvas>
       <ul class="places">
         <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button><a href="/warrenia" data-island-go="warrenia">o entrar ya</a></li>
-        <li><button type="button" data-go="taller">Ir al Taller</button><a href="#sobre-mi" data-island-go="about">o leer «Sobre mí»</a></li>
+        <li><button type="button" data-go="taller">Ir a la obra (próximamente)</button></li>
         <li><button type="button" data-go="observatorio">Ir al Observatorio</button><a href="/constelacion" data-island-go="observatorio">o subir ya</a></li>
         <li><button type="button" data-go="muelle">Volver al muelle</button></li>
-      </ul>
-    </dialog>
-    <dialog class="map about-card" data-about aria-labelledby="about-card-title">
-      <header><h2 id="about-card-title">Taller · Sobre mí</h2><form method="dialog"><button class="icon-btn" aria-label="Cerrar">✕</button></form></header>
-      <p>Soy {author.name}. Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo: economía, finanzas, geopolítica, negocio e inteligencia artificial.</p>
-      <p>En la isla hay dos de esas cosas: WarrenIA, en el pabellón de cristal, y mi biblioteca de lectura, en el cielo del observatorio.</p>
-      <ul class="places">
-        <li><button type="button" data-go="warrenia">Ir al Pabellón WarrenIA</button></li>
-        <li><button type="button" data-go="observatorio">Ir al Observatorio</button></li>
-        <li><a href={author.github}>Mi GitHub</a></li>
       </ul>
     </dialog>
     <noscript><div class="fallback show"><p>La isla en 3D necesita JavaScript.</p><a class="go" href="#proyectos">Ver los proyectos</a></div></noscript>
@@ -113,7 +103,7 @@ const places = {
       <header class="hero">
         <p class="eyebrow">Proyectos</p>
         <h1>{author.name}</h1>
-        <p class="lede">Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo. Aquí están las dos cosas.</p>
+        <p class="lede">Un sistema de inteligencia financiera y una biblioteca de notas de lectura.</p>
       </header>
 
       <section class="projects" aria-label="Proyectos">
@@ -143,13 +133,6 @@ const places = {
         </article>
       </section>
 
-      <section class="about" id="sobre-mi" aria-labelledby="about-title">
-        <p class="eyebrow">El taller</p>
-        <h2 id="about-title">Sobre mí</h2>
-        <p>Construyo herramientas que trabajan con datos y tomo notas de todo lo que leo: economía, finanzas, geopolítica, negocio e inteligencia artificial.</p>
-        <a class="link" href={author.github}>GitHub</a>
-      </section>
-
       <footer>
         <p>
           Toro: «<a href="https://sketchfab.com/3d-models/bull-walk-cycle-d59e56bc90a34bcd826d02798a54ac96">bull walk cycle</a>» de
@@ -157,7 +140,6 @@ const places = {
           <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, recoloreado en negro; sus pasos se generan por código con la tabla de pasos de <a href="https://github.com/majidmanzarpour/threejs-procedural-animals">threejs-procedural-animals</a> (MIT).
           Letras: Bricolage Grotesque (SIL OFL 1.1). Sonido sintetizado en el navegador.
         </p>
-        <a href={author.github}>GitHub</a>
       </footer>
     </main>
   </div>
@@ -226,6 +208,7 @@ const places = {
   .prompt { position: absolute; left: 14px; bottom: max(14px, env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100% - 84px)); border-radius: 18px; padding: 16px 18px; display: grid; gap: 8px; animation: rise 0.35s ease-out; }
   .prompt h2 { font: 700 18px/1.15 var(--f-display); }
   .prompt p { font-size: 14px; color: rgb(244 245 251 / 0.82); }
+  .prompt[data-no-action] :is(.go, .key) { display: none; }
   .prompt .key { position: absolute; right: 14px; top: 14px; font: 600 11px/1 var(--f-mono); padding: 5px 7px; border-radius: 6px; border: 1px solid rgb(255 255 255 / 0.3); }
   @media (pointer: coarse) { .prompt .key { display: none; } }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
@@ -265,7 +248,6 @@ const places = {
   .places button { font: 600 14px/1 var(--f-body); color: var(--ink); background: rgb(255 255 255 / 0.08); border: 1px solid var(--line); border-radius: 99px; padding: 10px 14px; cursor: pointer; }
   .places button:hover { background: rgb(255 255 255 / 0.14); }
   .places a { font-size: 13.5px; color: var(--ink-2); }
-  .about-card p { color: var(--ink-2); font-size: 15px; margin-bottom: 10px; }
 
   /* ---- the page under the island */
   .page main { max-width: 1040px; margin: 0 auto; padding-block: clamp(48px, 10vw, 120px) 64px; display: grid; gap: clamp(40px, 7vw, 80px); }
@@ -285,9 +267,6 @@ const places = {
   .card .kicker { color: var(--dusk-2); }
   .facts { font: 500 var(--step--1) / 1.4 var(--f-mono); color: var(--ink) !important; }
   .link { justify-self: start; color: var(--ink); text-underline-offset: 4px; }
-  .about { display: grid; gap: 14px; max-width: 46rem; scroll-margin-top: 24px; }
-  .about h2 { font-size: var(--step-1); }
-  .about p { color: var(--ink-2); }
   footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; color: var(--ink-3); font-size: var(--step--1); border-top: 1px solid var(--line); padding-top: 20px; }
   footer p { max-width: 60ch; }
 </style>

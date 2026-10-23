@@ -78,19 +78,19 @@ export function buildSite(cx: number, cy: number, cz: number, concrete: THREE.Ma
   panel(F.x0, F.z0, F.x1, F.z0); panel(F.x1, F.z0, F.x1, F.z1); panel(F.x0, F.z1, F.x1, F.z1);
   panel(F.x0, F.z0, F.x0, F.z1);
   stat.add(shadowy(new THREE.Mesh(mergeGeometries(fence), mat(0x2f3a33))));
-  // the board, facing the path (west) on two tall posts, above the bull's head: "PRÓXIMAMENTE"
+  // the board, facing the path (west) on two tall posts, above the bull's head and the trees by the path
   const boardTex = comingSoon();
   const by = height(cx + F.x0, cz + 0.1);
   const board = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.5, 6.0), [
     new THREE.MeshStandardMaterial({ color: 0x1d2420 }),
-    new THREE.MeshStandardMaterial({ map: boardTex, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: 0.4, roughness: 0.7 }),
+    new THREE.MeshStandardMaterial({ map: boardTex, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: 0.6, roughness: 0.7 }),
     ...Array.from({ length: 4 }, () => new THREE.MeshStandardMaterial({ color: 0x1d2420 })),
   ]);
-  board.position.set(cx + F.x0 - 0.1, by + 3.75, cz + 0.1);
+  board.position.set(cx + F.x0 - 0.1, by + 4.45, cz + 0.1);
   stat.add(shadowy(board));
   for (const dz of [-2.6, 2.8]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 5.5, 0.16), mat(0x1d2420));
-    post.position.set(cx + F.x0, by + 2.75, cz + 0.1 + dz);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 6.2, 0.16), mat(0x1d2420));
+    post.position.set(cx + F.x0, by + 3.1, cz + 0.1 + dz);
     stat.add(shadowy(post));
   }
 
@@ -251,23 +251,31 @@ function towerCrane(o: { x: number; z: number; y: number; mast: number; jib: num
 
 /** The board on the fence: what's coming, without saying what. */
 function comingSoon() {
-  const W = 1024, H = 600, c = document.createElement('canvas');
+  // (the board's shape, 6 × 3.5 m: big letters, readable from the path)
+  const W = 2048, H = 1195, c = document.createElement('canvas');
   c.width = W; c.height = H;
   const x = c.getContext('2d')!;
   x.fillStyle = '#16201b'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#f2b822'; x.lineWidth = 18; x.strokeRect(40, 40, W - 80, H - 230);
   // hazard stripes along the bottom
-  x.save(); x.beginPath(); x.rect(0, H - 70, W, 70); x.clip();
-  for (let i = -2; i < 24; i++) { x.fillStyle = i % 2 ? '#16201b' : '#f2b822'; x.beginPath(); x.moveTo(i * 50, H); x.lineTo(i * 50 + 50, H); x.lineTo(i * 50 + 120, H - 70); x.lineTo(i * 50 + 70, H - 70); x.fill(); }
+  const sh = 150;
+  x.save(); x.beginPath(); x.rect(0, H - sh, W, sh); x.clip();
+  for (let i = -2; i < 24; i++) { x.fillStyle = i % 2 ? '#16201b' : '#f2b822'; x.beginPath(); x.moveTo(i * 100, H); x.lineTo(i * 100 + 100, H); x.lineTo(i * 100 + 250, H - sh); x.lineTo(i * 100 + 150, H - sh); x.fill(); }
   x.restore();
+  const fit = (text: string, weight: number, size: number, max: number) => {
+    const font = (px: number) => `${weight} ${px}px "Bricolage Grotesque Variable", system-ui, sans-serif`;
+    x.font = font(size);
+    while (x.measureText(text).width > max && size > 40) x.font = font((size -= 4));
+  };
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillStyle = '#f2b822'; x.font = '700 40px "Bricolage Grotesque Variable", system-ui, sans-serif';
-  x.fillText('PROYECTO III', W / 2, 110);
-  x.fillStyle = '#f6efe2'; x.font = '800 128px "Bricolage Grotesque Variable", system-ui, sans-serif';
-  x.fillText('PRÓXIMAMENTE', W / 2, 250, W - 80);
-  x.fillStyle = 'rgba(246,239,226,0.75)'; x.font = '600 40px "Bricolage Grotesque Variable", system-ui, sans-serif';
-  x.fillText('Se está construyendo. Vuelve pronto.', W / 2, 390);
+  x.fillStyle = '#f2b822'; fit('PROYECTO III · EN OBRAS', 800, 110, W - 240);
+  x.fillText('PROYECTO III · EN OBRAS', W / 2, 200);
+  x.fillStyle = '#ffffff'; fit('PRÓXIMAMENTE', 800, 330, W - 200);
+  x.fillText('PRÓXIMAMENTE', W / 2, 470);
+  x.fillStyle = '#f6efe2'; fit('Se está construyendo. Vuelve pronto.', 700, 104, W - 240);
+  x.fillText('Se está construyendo. Vuelve pronto.', W / 2, 760);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = 16;
   return tex;
 }

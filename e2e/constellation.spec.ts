@@ -40,6 +40,8 @@ test('search flies to a note and opens it in the panel', async ({ page }) => {
   await expect(page).toHaveURL(/#patron-oro$/);
   await expect(page.locator('#panel .prose')).not.toHaveAttribute('aria-busy');
   await expect(page.locator('#panel .prose')).toContainText('sistema monetario');
+  // an idea's definition comes first, before the books and ideas it connects to
+  await expect(page.locator('#panel h3').first()).toHaveText('Definición');
 });
 
 test('a link to a note opens the sky focused on it, and links in the panel fly to their star', async ({ page }) => {

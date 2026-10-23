@@ -771,6 +771,8 @@ class App {
       ? `<section><h3>${isBook ? 'Todas sus ideas' : 'Ideas enlazadas'} <span>${fmt.format(concepts.length)}</span></h3><ul class="links">${concepts.slice(0, hashPrefix ? Infinity : 60).map((j) => link(j)).join('')}</ul>${!hashPrefix && concepts.length > 60 ? `<p class="more"><a href="/biblioteca/${slug}">Ver las ${fmt.format(concepts.length)} en su página</a></p>` : ''}</section>`
       : '';
     const tourTitle = tour ? (tour.title ? `«${esc(tour.title)}»` : `Ideas de «${esc(this.bookTitle(tour.book))}»`) : '';
+    // a book's summary comes after its main ideas; an idea's definition comes first, before its connections
+    const prose = `<section><h3>${isBook ? 'Resumen' : 'Definición'}</h3><div class="prose" aria-busy="true"><p class="loading-text">Cargando la nota…</p></div></section>`;
     panel.innerHTML = `
       <button type="button" class="back-link" data-action="close" style="--c:${theme.color}">${ICON.back}Biblioteca</button>
       ${tour ? `<div class="tour"><button type="button" data-action="prev" ${tour.index === 0 ? 'disabled' : ''} aria-label="Anterior">←</button><span>${tourTitle} · ${tour.index + 1} de ${tour.stops.length}</span><button type="button" data-action="next" ${tour.index === tour.stops.length - 1 ? 'disabled' : ''} aria-label="Siguiente">→</button></div>` : ''}
@@ -784,8 +786,7 @@ class App {
         ${isBook && concepts.length ? `<button type="button" class="primary" data-action="tour">${ICON.play}Recorrer el libro</button>` : ''}
         ${hashPrefix ? '' : `<a href="/biblioteca/${slug}"${isBook ? '' : ' class="primary"'}>Abrir la página</a>`}
       </div>
-      ${sections}
-      <section><h3>${isBook ? 'Resumen' : 'La idea'}</h3><div class="prose" aria-busy="true"><p class="loading-text">Cargando la nota…</p></div></section>
+      ${isBook ? sections + prose : prose + sections}
       ${allIdeas}
     `;
     panel.querySelector('.actions')!.toggleAttribute('hidden', !panel.querySelector('.actions')!.children.length);

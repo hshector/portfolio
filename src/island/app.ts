@@ -21,7 +21,7 @@ import { createVisit } from './observatory';
 import { createPavilion } from './pavilion';
 import { appPath, START } from './warrenia';
 import {
-  DOORS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
+  DOORS, JETTY, PATHS, SITES, groundAt, height, routeTo, surfaceAt, walkable, type SiteId,
 } from './terrain';
 import { MAP_SPAN, buildWorld, type Quality } from './world';
 
@@ -106,7 +106,8 @@ export async function startIsland({ root, places }: IslandOptions) {
     mapBtn: $<HTMLButtonElement>('[data-map-open]'), map: $<HTMLDialogElement>('dialog[data-map]'), mapCanvas: $<HTMLCanvasElement>('[data-map-canvas]'),
     joystick: $('[data-joystick]'), debug: $('[data-debug]'),
   };
-  const mapImage = world.mapImage();
+  // (the terrain picture is computed the first time the map opens)
+  let mapImage: HTMLCanvasElement | null = null;
 
   /** Nothing is going on: no trip up the observatory or into the pavilion. */
   const idle = () => visit.state === 'island' && pav.state === 'island';
@@ -162,26 +163,62 @@ export async function startIsland({ root, places }: IslandOptions) {
     setView('follow');
   }
 
+  /** The map: the island from above at the screen's own resolution, the paths, each place with its
+   *  name on a pill, and the bull as an arrow ("Tú"). North up. */
   function drawMap() {
     const c = ui.mapCanvas, x = c.getContext('2d')!;
-    const n = c.width;
+    const px = Math.round(c.clientWidth * Math.min(devicePixelRatio || 1, 3)) || 440;
+    if (c.width !== px) c.width = c.height = px;
+    const n = px;
+    mapImage ??= world.mapImage();
+    x.imageSmoothingQuality = 'high';
     x.drawImage(mapImage, 0, 0, n, n);
     const toMap = (wx: number, wz: number) => [((wx / MAP_SPAN) + 0.5) * n, ((wz / MAP_SPAN) + 0.5) * n] as const;
-    x.font = `600 ${Math.round(n * 0.045)}px "Hanken Grotesk Variable", system-ui, sans-serif`;
-    x.textAlign = 'center';
-    for (const s of Object.values(SITES)) {
-      const [mx, mz] = toMap(s.x, s.z);
-      x.fillStyle = '#ff8a70'; x.beginPath(); x.arc(mx, mz, n * 0.022, 0, Math.PI * 2); x.fill();
-      x.lineWidth = 3; x.strokeStyle = 'rgba(5,6,13,0.75)'; x.fillStyle = '#fff';
-      const ty = mz + (s.z < 0 ? -n * 0.04 : n * 0.065);
-      x.strokeText(s.label, mx, ty); x.fillText(s.label, mx, ty);
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    // the paths: a light line with a dark edge
+    for (const [w, color] of [[n * 0.016, 'rgba(40,24,10,0.55)'], [n * 0.008, '#f6e2b6']] as const) {
+      x.lineWidth = w; x.strokeStyle = color;
+      for (const path of PATHS) {
+        x.beginPath();
+        path.forEach(([wx, wz], k) => { const [mx, mz] = toMap(wx, wz); if (k) x.lineTo(mx, mz); else x.moveTo(mx, mz); });
+        x.stroke();
+      }
     }
+    // the jetty
+    const [j0x, j0z] = toMap(JETTY.x - JETTY.halfWidth, JETTY.z0), [j1x, j1z] = toMap(JETTY.x + JETTY.halfWidth, JETTY.z1);
+    x.fillStyle = '#8a6440'; x.fillRect(j0x, j0z, j1x - j0x, j1z - j0z);
+    // the places: a pin, and the name on a pill on the far side from the island's centre
+    const fs = Math.round(n * 0.042);
+    x.font = `650 ${fs}px "Hanken Grotesk Variable", system-ui, sans-serif`;
+    x.textBaseline = 'middle';
+    for (const site of Object.values(SITES)) {
+      const [mx, mz] = toMap(site.x, site.z);
+      x.fillStyle = '#ff8a70'; x.strokeStyle = '#fff'; x.lineWidth = n * 0.006;
+      x.beginPath(); x.arc(mx, mz, n * 0.02, 0, Math.PI * 2); x.fill(); x.stroke();
+      const label = site.label, tw = x.measureText(label).width, ph = fs * 1.55, pw = tw + fs * 1.1;
+      const vertical = Math.abs(site.z) > Math.abs(site.x);
+      let lx = mx - pw / 2, ly = mz - ph / 2;
+      if (vertical) ly += (site.z < 0 ? -1 : 1) * (ph / 2 + n * 0.035);
+      else lx += (site.x < 0 ? -1 : 1) * (pw / 2 + n * 0.035);
+      lx = Math.max(n * 0.02, Math.min(n * 0.98 - pw, lx));
+      ly = Math.max(n * 0.02, Math.min(n * 0.98 - ph, ly));
+      x.fillStyle = 'rgba(10,12,24,0.86)';
+      x.beginPath(); x.roundRect(lx, ly, pw, ph, ph / 2); x.fill();
+      x.fillStyle = '#fff'; x.textAlign = 'center';
+      x.fillText(label, lx + pw / 2, ly + ph / 2 + fs * 0.04);
+    }
+    // north
+    x.fillStyle = 'rgba(10,12,24,0.86)'; x.beginPath(); x.arc(n * 0.93, n * 0.07, n * 0.04, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText('N', n * 0.93, n * 0.07 + fs * 0.04);
     // the bull: an arrow pointing where it's heading
     const [bx, bz] = toMap(me.x, me.z);
     x.save(); x.translate(bx, bz); x.rotate(-me.heading + Math.PI);
-    x.fillStyle = '#05060d'; x.strokeStyle = '#fff'; x.lineWidth = 2;
-    x.beginPath(); x.moveTo(0, -n * 0.035); x.lineTo(n * 0.022, n * 0.022); x.lineTo(0, n * 0.01); x.lineTo(-n * 0.022, n * 0.022); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = '#05060d'; x.strokeStyle = '#fff'; x.lineWidth = n * 0.006;
+    x.beginPath(); x.moveTo(0, -n * 0.045); x.lineTo(n * 0.03, n * 0.03); x.lineTo(0, n * 0.014); x.lineTo(-n * 0.03, n * 0.03); x.closePath(); x.fill(); x.stroke();
     x.restore();
+    x.font = `800 ${Math.round(fs * 0.9)}px "Hanken Grotesk Variable", system-ui, sans-serif`;
+    x.lineWidth = n * 0.008; x.strokeStyle = 'rgba(5,6,13,0.85)'; x.fillStyle = '#fff'; x.textAlign = 'left';
+    x.strokeText('Tú', bx + n * 0.04, bz); x.fillText('Tú', bx + n * 0.04, bz);
     if (ui.map.open) requestAnimationFrame(drawMap);
   }
 

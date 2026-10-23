@@ -22,8 +22,9 @@ Código en `src/island/`:
 | `terrain.ts` | Forma de la isla, caminos, lugares, superficies, por dónde puede ir el toro y rutas del mapa. Sin three.js; con tests (`tests/island.test.ts`). |
 | `palette.ts` | Las dos luces (atardecer y noche) y la mezcla según la distancia al observatorio. |
 | `world.ts` | Cielo, terreno con arena mojada, mar con resaca, hierba, encinas, muros, flores, los cuatro lugares, molino, el alias en piedra y carteles. |
+| `ship.ts` | El barco pirata amarrado al muelle: casco curvo con troneras y cañones, castillo de popa con ventanas encendidas, tres palos con velas gastadas, foque, jarcia y bandera pirata que ondea; se mece con la marejada. |
 | `site.ts` | La obra del próximo proyecto: estructura de hormigón, andamio, dos grúas torre que giran con su carga, valla y cartel «Próximamente»; luces rojas que parpadean y foco de noche. |
-| `shaders.ts` | Trozos de shader compartidos: niebla, árboles que se vuelven translúcidos y copas que se mecen. |
+| `shaders.ts` | Trozos de shader compartidos: niebla, lo que tapa al toro se vuelve translúcido y copas que se mecen. Lo que se pisa (el muelle) y el barco van marcados como sólidos (`userData.solid`): antes, al pisar el muelle, el muelle entero «tapaba» al toro y desaparecía. |
 | `bull.ts` | El toro: su postura de reposo, el pelaje, respiración, cola y cabeza que mira a los lugares. |
 | `locomotion.ts` | Los pasos del toro, generados cada fotograma: paso, trote, medio galope y galope, con las pezuñas clavadas donde pisan. |
 | `observatory.ts` | La subida del observatorio a la constelación y la vuelta, sin salir de la isla. |

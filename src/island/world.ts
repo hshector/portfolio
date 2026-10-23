@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import nameGlyphs from './name-glyphs.json';
 import { FOG_APPLY, FOG_PARS, OUT, patchMaterial, type Shared } from './shaders';
 import { buildBolsa } from './bolsa';
+import { buildShip } from './ship';
 import { buildSite } from './site';
 import type { LightUniforms } from './palette';
 import {
@@ -314,11 +315,12 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   part(0.12, 1.0, 0.12, JETTY.x - 1.4, JETTY.deck + 0.5, JETTY.z1 - 0.4);
   const jetty = new THREE.Mesh(mergeGeometries(jettyParts), wood);
   jetty.castShadow = jetty.receiveShadow = true;
+  // (never see-through: the bull walks on it, so it is always "between" the camera and the bull)
+  jetty.userData.solid = true;
   props.add(jetty);
-  // a small boat moored at the end
-  const boat = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.6, 4.2, 10, 1, false, 0, Math.PI), mat(0x8a3b2a));
-  boat.rotation.set(Math.PI / 2, 0, Math.PI); boat.position.set(JETTY.x + 3.2, 0.25, JETTY.z1 - 3);
-  boat.castShadow = true; props.add(boat);
+  // a pirate ship moored alongside, its bow out to sea (not see-through either: it is never in the way)
+  const ship = buildShip(JETTY.x + 5.0, JETTY.z1 - 5);
+  scene.add(ship.group);
 
   // WarrenIA: a small, modern stock-exchange palace (bolsa.ts) with its mark carved in the pediment.
   // On its back wall, facing the doors, a big screen shows the app's radar (drawn from the public
@@ -425,19 +427,19 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   const signs: THREE.Mesh[] = [];
   const signpost = (x: number, z: number, boards: { text: string; angle: number }[]) => {
     const y = height(x, z);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 3.9, 6), wood);
-    post.position.set(x, y + 1.95, z); post.castShadow = true; props.add(post);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 4.5, 8), wood);
+    post.position.set(x, y + 2.25, z); post.castShadow = true; props.add(post);
     boards.forEach((b, i) => {
       // painted on both faces (from behind, the arrow points the other way), and faintly lit by
       // their own paint so they still read in shadow and at dusk
       const face = (back: boolean) => {
         const map = textTexture(b.text, back);
-        return new THREE.MeshStandardMaterial({ map, roughness: 0.8, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.32 });
+        return new THREE.MeshStandardMaterial({ map, roughness: 0.8, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.55 });
       };
-      const m = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.82, 0.08), [wood, wood, wood, wood, face(false), face(true)]);
-      m.position.set(x, y + 3.3 - i * 0.95, z);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.98, 0.1), [wood, wood, wood, wood, face(false), face(true)]);
+      m.position.set(x, y + 4.0 - i * 1.12, z);
       m.rotation.y = b.angle;
-      m.translateX(1.72);
+      m.translateX(2.08);
       m.castShadow = true;
       props.add(m); signs.push(m);
     });
@@ -485,7 +487,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
   // see-through for everything that can stand between the camera and the bull; crowns also sway
   props.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh || Array.isArray(mesh.material) || !(mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial || (mesh.material as THREE.Material).transparent) return;
+    if (!mesh.isMesh || mesh.userData.solid || Array.isArray(mesh.material) || !(mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial || (mesh.material as THREE.Material).transparent) return;
     patchMaterial(mesh, shared, { seeThrough: true, sway: !!mesh.userData.sway });
   });
 
@@ -501,6 +503,7 @@ export function buildWorld(shared: Shared, light: LightUniforms, quality: Qualit
       rotor.rotation.z -= dt * (1.2 + shared.wind.value * 2);
       site.update(time, night);
       bolsa.update(dt);
+      ship.update(time);
       for (const c of clouds) c.position.x = ((c.position.x + dt * 1.2 + 260) % 520) - 260;
       (beamMat.uniforms.uColor.value as THREE.Color).set('#ffd59a').lerp(new THREE.Color('#9fc0ff'), night);
     },
@@ -547,31 +550,37 @@ function inside(p: THREE.Vector2, poly: THREE.Vector2[]) {
   return c;
 }
 
-/** Painted wooden board with a place name. */
 /** A signpost board: dark letters on pale painted wood, the arrow on the side it points to. */
 function textTexture(text: string, back = false) {
-  const W = 1024, H = 233, c = document.createElement('canvas');
+  // (the board's shape, 4.3 × 0.98 m, at ~480 px per metre: sharp up close)
+  const W = 2048, H = 467, c = document.createElement('canvas');
   c.width = W; c.height = H;
   const x = c.getContext('2d')!;
-  x.fillStyle = '#efe2c6'; x.fillRect(0, 0, W, H);
-  x.fillStyle = 'rgba(90,60,30,0.08)'; for (let i = 0; i < 8; i++) x.fillRect(0, 14 + i * 28, W, 3);
-  x.strokeStyle = '#5a3a22'; x.lineWidth = 10; x.strokeRect(5, 5, W - 10, H - 10);
+  x.fillStyle = '#f1e5c9'; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(90,60,30,0.07)'; for (let i = 0; i < 9; i++) x.fillRect(0, 26 + i * 50, W, 5);
+  x.strokeStyle = '#4a2f1b'; x.lineWidth = 22; x.strokeRect(11, 11, W - 22, H - 22);
+  // the arrow, a big solid chevron on the side it points to
+  const d = back ? 1 : -1, ax = back ? 64 : W - 64;
   x.fillStyle = '#2b1a0e';
-  x.font = '800 138px "Bricolage Grotesque Variable", system-ui, sans-serif';
+  x.beginPath(); x.moveTo(ax, H / 2); x.lineTo(ax + d * 170, H / 2 - 140); x.lineTo(ax + d * 170, H / 2 + 140); x.closePath(); x.fill();
+  // the name, as big as fits beside the arrow, never squeezed
+  const room = W - 260 - 120, cx = back ? 260 + room / 2 + 40 : 120 + room / 2 - 40;
+  let size = 270;
+  const font = (px: number) => `800 ${px}px "Bricolage Grotesque Variable", system-ui, sans-serif`;
+  x.font = font(size);
+  while (x.measureText(text).width > room && size > 120) x.font = font((size -= 6));
   x.textBaseline = 'middle'; x.textAlign = 'center';
-  x.fillText(text, back ? W / 2 + 40 : W / 2 - 40, H / 2 + 4, W - 190);
-  // the arrow
-  const ax = back ? 30 : W - 30, d = back ? 1 : -1;
-  x.beginPath(); x.moveTo(ax, H / 2); x.lineTo(ax + d * 80, H / 2 - 62); x.lineTo(ax + d * 80, H / 2 + 62); x.fill();
+  x.fillText(text, cx, H / 2 + 10);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = 16;
   return tex;
 }
 
 /** The map: terrain colours from above, paths and the sea, north up. */
 function drawMap() {
-  const n = 220, c = document.createElement('canvas');
+  // (480 px: drawn once, the first time the map opens, then scaled to the screen with smoothing)
+  const n = 480, c = document.createElement('canvas');
   c.width = c.height = n;
   const x = c.getContext('2d')!, img = x.createImageData(n, n);
   const span = 150; // metres shown
